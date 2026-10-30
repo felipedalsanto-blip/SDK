@@ -76,3 +76,11 @@ export type AnaliseClassificacao = {
   parcial: boolean
   tabela: { fonte: string; obtidoEm: string }
 }
+
+export type PontoProjecao = {
+  ano: number
+  perda: number
+  ganho: number
+  /** Multiplicador para 12 meses (12 ÷ meses analisados), ou null se o cálculo não informa o período. */
+  fatorAnual: number | null
+}
