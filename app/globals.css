@@ -490,3 +490,6 @@ tr.np-atual td { background: color-mix(in srgb, var(--pt-amarelo) 14%, transpare
 .np-aviso { padding: 10px 12px; border-radius: 10px; background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--text-primary); }
 .memoria-aliq { color: var(--text-muted); font-size: 11.5px; }
 @media (max-width: 720px) { .np-campos input[type="number"] { width: 100%; } .np-campos label { flex: 1 1 140px; } }
+.np-gerais { margin-top: 8px; font-size: 12.5px; color: var(--text-secondary); }
+.np-gerais summary { cursor: pointer; font-weight: 600; }
+.np-ref .cap-sub { margin-top: 6px; }

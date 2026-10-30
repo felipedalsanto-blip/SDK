@@ -1,6 +1,7 @@
 "use client"
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { CCLASS, CST, fator } from "@/lib/cclass"
+import type { Classificacao, Opcao } from "@/lib/receita"
 import {
   ATUAIS,
   baseCliente,
@@ -9,6 +10,7 @@ import {
   simular,
   type Atual,
   type Entrada,
+  type Metodo,
   type Nota,
   type Precificacao,
   type RefNcm,
@@ -21,6 +23,7 @@ import { Alternar, Bloco, Capitulo, Diferenca, Indicador, LinhasAno, Premissa } 
 
 const TIPOS: Record<Tipo, string> = { produto: "Produto", servico: "Serviço", locacao: "Locação" }
 const NOME_ATUAL: Record<Atual, string> = { icms: "ICMS", iss: "ISS", pis_cofins: "PIS/COFINS", ipi: "IPI" }
+const METODOS: Record<Metodo, string> = { transicao: "Transição completa", novos: "Só os novos tributos" }
 const MODOS = { margem: "Margem sobre o preço líquido (%)", markup: "Markup sobre o custo (%)", preco: "Preço líquido informado (R$)" }
 
 /** O cClassTrib agrupado por CST, para o seletor. */
@@ -30,6 +33,8 @@ const CLASSES_POR_CST = Object.entries(CCLASS).reduce<Record<string, [string, st
 }, {})
 
 const digitos = (s: string) => s.replace(/\D/g, "")
+/** Da opção da lista ("101011100 · Serviços de…") fica só o código; texto livre segue como está, para a busca. */
+const nbsDe = (v: string) => (/^\d{9}\s·/.test(v) ? v.slice(0, 9) : v)
 const pct2 = (v: number) => Math.round(v * 10000) / 100
 
 function padrao(d: Precificacao): Entrada {
@@ -37,6 +42,8 @@ function padrao(d: Precificacao): Entrada {
     tipo: "produto",
     descricao: "",
     ncm: "",
+    nbs: "",
+    metodo: "transicao",
     custo: 100,
     margemModo: "margem",
     margem: 30,
@@ -107,6 +114,35 @@ function Simulador({
     return ref || pos.length < 4 ? [] : d.ncms.filter((r) => digitos(r.ncm).startsWith(pos)).slice(0, 6)
   }, [d, e.ncm, ref])
 
+  // Classificação oficial (calculadora da Receita): NCM para produto, NBS para serviço e locação.
+  const produto = e.tipo === "produto"
+  const codigo = produto ? digitos(e.ncm) : digitos(e.nbs)
+  const pronto = produto ? codigo.length === 8 : codigo.length === 9
+  const oficial = useBusca(
+    pronto ? (s) => api<Classificacao>(`/api/receita?tipo=${produto ? "ncm" : "nbs"}&codigo=${codigo}&ano=${e.ano}`, undefined, s) : null,
+    [pronto, produto, codigo, e.ano],
+  )
+  const classif = oficial.dados && oficial.dados.codigo === codigo ? oficial.dados : null
+  const listaNbs = useBusca(produto ? null : (s) => api<{ codigo: string; descricao: string }[]>(`/api/receita?tipo=nbs-lista&ano=${e.ano}`, undefined, s), [produto, e.ano])
+  // Ao chegar a classificação de um código novo, já escolhe o cClassTrib. NCM: o benefício do anexo
+  // com maior redução; sem benefício, o que a Pricetax calculou no histórico; senão, a regra geral.
+  // NBS: só quando há uma classificação própria (com várias, cada uma depende da operação).
+  const aplicado = useRef<string | null>(null)
+  useEffect(() => {
+    if (!classif) return
+    const chaveCod = `${classif.tipo}:${classif.codigo}`
+    if (aplicado.current === chaveCod) return
+    aplicado.current = chaveCod
+    const sugerido =
+      classif.tipo === "ncm"
+        ? (classif.especificas[0]?.cclass ?? ref?.classes[0]?.cclass ?? "000001")
+        : classif.especificas.length === 1
+          ? classif.especificas[0].cclass
+          : "000001"
+    if (sugerido !== e.cclass) mudar({ cclass: sugerido })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classif])
+
   const hoje = simular(e, "ar")
   const nota = simular(e, e.ano)
   const porAno = d.anos.map((a) => simular(e, a))
@@ -131,7 +167,14 @@ function Simulador({
         </p>
       )}
 
-      <Bloco titulo="1. O que você vai vender" leitura="Informe o NCM: se ele já aparece nas suas vendas, trazemos o cClassTrib que a Pricetax calculou e as alíquotas que você pratica hoje.">
+      <Bloco
+        titulo="1. O que você vai vender"
+        leitura={
+          produto
+            ? "Informe o NCM: a calculadora oficial da Receita diz se ele tem redução (anexos da LC 214) e já escolhemos o cClassTrib. Se o NCM aparece nas suas vendas, trazemos também as alíquotas que você pratica hoje."
+            : "Informe a NBS (código ou parte da descrição): a calculadora oficial da Receita traz as classificações do serviço e já escolhemos o cClassTrib. Sem redução específica, fica a regra geral."
+        }
+      >
         <div className="np-campos">
           <div className="np-rotulo">
             Tipo
@@ -141,8 +184,20 @@ function Simulador({
             Descrição
             <input value={e.descricao} placeholder="Ex.: válvula de controle 2 polegadas" onChange={(x) => mudar({ descricao: x.target.value })} />
           </label>
+          {!produto && (
+            <label className="np-largo">
+              NBS
+              <input value={e.nbs} list="np-nbs" placeholder="9 dígitos ou descrição" onChange={(x) => mudar({ nbs: nbsDe(x.target.value) })} />
+              <datalist id="np-nbs">
+                {(listaNbs.dados ?? []).map((n) => (
+                  <option key={n.codigo} value={`${n.codigo} · ${n.descricao}`} />
+                ))}
+              </datalist>
+            </label>
+          )}
+          {produto && (
           <label>
-            {e.tipo === "produto" ? "NCM" : "NCM / código (opcional)"}
+            NCM
             <input
               value={e.ncm}
               list="np-ncms"
@@ -163,11 +218,22 @@ function Simulador({
               ))}
             </datalist>
           </label>
+          )}
         </div>
-        <Referencia e={e} ref_={ref} vizinhos={vizinhos} aplicar={aplicarRef} mudar={mudar} d={d} />
+        <Oficial carregando={oficial.carregando} erro={pronto ? oficial.erro : null} c={classif} atual={e.cclass} escolher={(cclass) => mudar({ cclass })} />
+        {produto && <Referencia e={e} ref_={ref} vizinhos={vizinhos} aplicar={aplicarRef} mudar={mudar} d={d} />}
       </Bloco>
 
-      <Bloco titulo="2. Custo e margem" leitura="O custo é o valor líquido, já sem os tributos que você recupera como crédito.">
+      <Bloco titulo="2. Custo, margem e metodologia" leitura="O custo é o valor líquido, já sem os tributos que você recupera como crédito.">
+        <div className="np-rotulo">
+          Metodologia
+          <Alternar opcoes={METODOS} valor={e.metodo} onChange={(metodo) => mudar({ metodo })} />
+          <span className="cap-sub">
+            {e.metodo === "transicao"
+              ? "Do preço líquido, inclui os tributos atuais que ainda restam no ano (por dentro) e soma IBS e CBS por fora: a nota real da transição."
+              : "Do preço líquido sem impostos, soma só IBS e CBS, sem desonerar nem incluir os tributos atuais. Os tributos de hoje servem só para comparar."}
+          </span>
+        </div>
         <div className="np-campos">
           <Numero rotulo="Custo líquido (R$)" valor={e.custo} passo={1} onChange={(v) => mudar({ custo: v })} />
           <label>
@@ -200,7 +266,11 @@ function Simulador({
 
       <Bloco
         titulo="3. Tributos de hoje"
-        leitura="Alíquotas nominais, como saem na nota hoje. ICMS, ISS e PIS/COFINS ficam dentro do preço; o IPI vai por fora. Nos anos seguintes elas seguem o cronograma da reforma."
+        leitura={
+          e.metodo === "transicao"
+            ? "Alíquotas nominais, como saem na nota hoje. ICMS, ISS e PIS/COFINS ficam dentro do preço; o IPI vai por fora. Nos anos seguintes elas seguem o cronograma da reforma."
+            : "Na metodologia só dos novos tributos, estas alíquotas não entram no preço da reforma: servem só para montar a nota de hoje e comparar."
+        }
       >
         <div className="np-campos">
           {ATUAIS.map((t) => (
@@ -301,7 +371,8 @@ function Simulador({
       </div>
 
       <Premissa>
-        Simulação a partir dos dados que você informa; nada é gravado na Pricetax (fica salvo só neste navegador). Alíquotas de referência: as das suas vendas no
+        Metodologia: {e.metodo === "transicao" ? "transição completa (tributos atuais que restam + IBS e CBS)" : "só os novos tributos (preço líquido + IBS e CBS)"}.
+        Classificação por NCM ou NBS na calculadora oficial da Receita (dados abertos); a escolha final do cClassTrib é sua. Simulação a partir dos dados que você informa; nada é gravado na Pricetax (fica salvo só neste navegador). Alíquotas de referência: as das suas vendas no
         cálculo, medidas sobre o valor sem tributos. Tributos atuais pelo cronograma da EC 132/2023: PIS e COFINS extintos e IPI zerado em 2027 (fora a Zona Franca);
         ICMS e ISS a 90%, 80%, 70% e 60% de 2029 a 2032 e extintos em 2033. IBS e CBS por fora, sobre o preço líquido, com a redução do cClassTrib. Não considera
         ICMS-ST, DIFAL, Imposto Seletivo nem regimes específicos.
@@ -319,6 +390,56 @@ function Numero({ rotulo, valor, passo, onChange }: { rotulo: string; valor: num
       {rotulo}
       <input type="number" min={0} step={passo} value={valor} onChange={(x) => onChange(Math.max(0, Number(x.target.value) || 0))} />
     </label>
+  )
+}
+
+function Oficial({
+  carregando,
+  erro,
+  c,
+  atual,
+  escolher,
+}: {
+  carregando: boolean
+  erro: unknown
+  c: Classificacao | null
+  atual: string
+  escolher: (cclass: string) => void
+}) {
+  if (erro) return <Erro erro={erro} />
+  if (!c) return carregando ? <p className="cap-nota">Consultando a calculadora oficial da Receita…</p> : null
+  const chip = (o: Opcao) => (
+    <button key={o.cclass} aria-pressed={atual === o.cclass} onClick={() => escolher(o.cclass)} title={o.nome}>
+      {o.cclass} · {o.nome.length > 60 ? `${o.nome.slice(0, 60)}…` : o.nome}
+      {o.reducaoCbs || o.reducaoIbs ? ` · −${o.reducaoCbs === o.reducaoIbs ? o.reducaoCbs : `${o.reducaoIbs}/${o.reducaoCbs}`}%` : ""}
+    </button>
+  )
+  return (
+    <div className={`np-ref${c.especificas.length ? " ok" : ""}`}>
+      <b>
+        {c.tipo === "ncm" ? "NCM" : "NBS"} {c.codigo}
+      </b>{" "}
+      · {c.descricao}
+      <span className="np-chips">
+        {c.especificas.length ? (c.tipo === "ncm" ? "Redução pelo NCM (anexos da LC 214):" : "Classificações próprias desta NBS:") : "Sem redução vinculada a este código:"}
+        {c.especificas.map(chip)}
+        {chip({ cclass: "000001", cst: "000", nome: "Regra geral (tributação integral)", reducaoCbs: 0, reducaoIbs: 0 })}
+      </span>
+      {c.gerais.length > 0 && (
+        <details className="np-gerais">
+          <summary>Outras {c.gerais.length} reduções que dependem de quem presta ou da operação</summary>
+          <span className="np-chips">{c.gerais.map(chip)}</span>
+        </details>
+      )}
+      <span className="cap-sub">
+        Fonte: {c.fonte}.{" "}
+        {c.especificas.length > 1
+          ? c.tipo === "ncm"
+            ? "Mais de uma opção: sugerimos a de maior redução; escolha a que corresponde à operação."
+            : "Mais de uma opção: ficou a regra geral até você escolher a que corresponde à operação."
+          : ""}
+      </span>
+    </div>
   )
 }
 
@@ -341,8 +462,8 @@ function Referencia({
   if (ref_) {
     return (
       <div className="np-ref ok">
-        <b>NCM {ref_.ncm} encontrado nas suas vendas</b> ({fmtInt(ref_.itens)} itens, {fmtBRL(ref_.valorAr)}). Trouxemos as alíquotas de hoje e o cClassTrib
-        calculado pela Pricetax.
+        <b>NCM {ref_.ncm} encontrado nas suas vendas</b> ({fmtInt(ref_.itens)} itens, {fmtBRL(ref_.valorAr)}). Trouxemos as alíquotas que você pratica hoje e, se a
+        Receita não indicar redução, o cClassTrib calculado pela Pricetax.
         {ref_.classes.length > 1 && (
           <span className="np-chips">
             Este NCM sai com mais de uma classificação:
@@ -358,7 +479,7 @@ function Referencia({
   }
   return (
     <div className="np-ref">
-      <b>NCM sem histórico neste cálculo.</b> A Pricetax ainda não classificou este item: escolha o cClassTrib no passo 4 (começa em tributação integral).
+      <b>NCM sem histórico neste cálculo.</b> As alíquotas de hoje partem da média das suas vendas; ajuste no passo 3.
       {vizinhos.length > 0 && (
         <span className="np-chips">
           NCMs da mesma posição que você já vende:

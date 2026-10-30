@@ -1,0 +1,24 @@
+{
+  "fonte": "https://consumo.tributos.gov.br/servico/calcular-tributos-consumo/api/calculadora/dados-abertos",
+  "versaoDb": "V0066",
+  "obtidoEm": "2026-10-30",
+  "restritos": [
+    "200003",
+    "200004",
+    "200005",
+    "200007",
+    "200008",
+    "200011",
+    "200014",
+    "200030",
+    "200031",
+    "200033",
+    "200034",
+    "200035",
+    "200038",
+    "200039",
+    "200043",
+    "200044",
+    "515001"
+  ]
+}

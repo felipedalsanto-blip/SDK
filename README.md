@@ -96,3 +96,11 @@ uma a uma) e a projeção, uma por ano. Tudo fica em cache no servidor por 10 mi
 
 - **Novo produto** (aba): simula o preço de um produto, serviço ou locação que não está no histórico. Parte do custo líquido + margem (ou markup, ou preço líquido informado), aplica os tributos de hoje (ICMS, ISS e PIS/COFINS por dentro; IPI por fora) e, em cada ano de 2027 a 2033, o cronograma da EC 132/2023 mais IBS e CBS por fora, com a redução do cClassTrib escolhido (tabela oficial). Se o NCM já aparece nas vendas do cálculo, traz o cClassTrib calculado pela Pricetax e as alíquotas praticadas; a alíquota cheia de IBS e CBS de cada ano vem das vendas tributadas do cálculo (editável). Mostra a formação do preço, os campos da NF-e, o custo para cada perfil de cliente e o total da nota ano a ano. Fica salvo só no navegador.
 - **Custo Neutro** (cenário de venda): derivado no painel, não vem da API. Parte do Com Reajuste e move o preço líquido só pela variação do custo das compras do ano, zerando a diferença do lucro bruto contra hoje, sem considerar despesas. Aparece em Vendas, DRE e fluxo de caixa.
+
+## Novo produto: classificação oficial e metodologia
+
+- **NCM (produto)**: a rota `/api/receita` consulta a calculadora oficial do IBS e da CBS da Receita (dados abertos, sem chave) e testa o NCM contra os cClassTrib que dependem do produto (anexos da LC 214, lista em `lib/ncm-restritos.json`, gerada por `npm run ncm:atualizar`). Havendo redução, o simulador já escolhe a de maior redução e mostra as alternativas; sem redução, usa o cClassTrib do histórico ou a regra geral (000001).
+- **NBS (serviço e locação)**: busca por código ou descrição; traz as classificações próprias da NBS e, recolhidas, as reduções gerais que dependem de quem presta ou da operação. Com uma única classificação própria, ela é escolhida; com várias, fica a regra geral até a escolha.
+- **Alíquota cheia de IBS e CBS**: a alíquota que a API de cálculos devolve nas vendas de tributação integral do ano (sem elas, tributo ÷ base ajustada pela redução). Editável.
+- **Metodologia**: "Transição completa" (tributos atuais que restam no ano, por dentro, + IBS e CBS por fora) ou "Só os novos tributos" (preço líquido + IBS e CBS, sem desonerar nem incluir os atuais).
+- Em desenvolvimento atrás de proxy, o Node precisa de `NODE_USE_ENV_PROXY=1` para chegar à calculadora da Receita.

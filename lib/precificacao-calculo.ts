@@ -6,6 +6,8 @@ import { fator } from "./cclass"
  * - ICMS, ISS e PIS/COFINS são "por dentro": valor do produto = preço líquido ÷ (1 − soma das alíquotas);
  * - IPI, IBS e CBS são "por fora"; IBS e CBS incidem sobre o preço líquido (o valor desonerado, a mesma
  *   base em que o cálculo da Pricetax mede as alíquotas) com a redução do cClassTrib;
+ * - metodologia "novos": parte do preço líquido e soma só IBS e CBS, sem os tributos atuais nos anos
+ *   da reforma (o "hoje" continua com os tributos atuais, para comparar);
  * - os tributos atuais seguem o cronograma da EC 132/2023: PIS e COFINS extintos e IPI zerado em 2027
  *   (fora a Zona Franca de Manaus); ICMS e ISS a 90%, 80%, 70% e 60% de 2029 a 2032 e extintos em 2033.
  */
@@ -34,11 +36,14 @@ export type Precificacao = {
 }
 
 export type Tipo = "produto" | "servico" | "locacao"
+export type Metodo = "transicao" | "novos"
 
 export type Entrada = {
   tipo: Tipo
   descricao: string
   ncm: string
+  nbs: string
+  metodo: Metodo
   custo: number
   margemModo: "margem" | "markup" | "preco"
   margem: number // % (ou R$ do preço líquido no modo "preco")
@@ -87,7 +92,10 @@ export type Nota = {
 
 export function simular(e: Entrada, periodo: number | "ar"): Nota {
   const pl = precoLiquido(e)
-  const nominal = Object.fromEntries(ATUAIS.map((t) => [t, (e.hoje[t] / 100) * transicao(t, periodo, e.ipiZfm)])) as Record<Atual, number>
+  const soNovos = e.metodo === "novos" && periodo !== "ar"
+  const nominal = Object.fromEntries(
+    ATUAIS.map((t) => [t, soNovos ? 0 : (e.hoje[t] / 100) * transicao(t, periodo, e.ipiZfm)]),
+  ) as Record<Atual, number>
   const dentro = nominal.icms + nominal.iss + nominal.pis_cofins
   const vProd = dentro < 1 ? pl / (1 - dentro) : 0
   const fat = { ibs: fator(e.cclass, "ibs"), cbs: fator(e.cclass, "cbs") }

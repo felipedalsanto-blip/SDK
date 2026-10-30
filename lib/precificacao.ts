@@ -23,6 +23,8 @@ const METRICAS = [
   "valor_desonerado_dr",
   ...IMPOSTOS.flatMap((t) => [`valor_${t}_ar`, `valor_${t}_dr`]),
 ] as Metrica[]
+// A alíquota que a própria API calcula, para medir a cheia nas vendas de tributação integral.
+const METRICAS_ALIQ = ["aliq_ibs_dr", "aliq_cbs_dr"] as Metrica[]
 
 type Somas = Record<string, number>
 const somar = (alvo: Somas, g: Grupo) => {
@@ -48,11 +50,12 @@ export async function montarPrecificacao(calculo: CalculoDetalhe, regime: Recort
       recorte: { regime, ano, cenario_vendas: "base", cenario_compras: "base" },
       sentido: "saida",
       agrupar_por: ["ncm", "cclass_calculado"],
-      metricas: METRICAS,
+      metricas: [...METRICAS, ...METRICAS_ALIQ],
     })
     parcial ||= r.parcial
     media.anos[ano] = {}
     const cheia = { ibs: { t: 0, b: 0 }, cbs: { t: 0, b: 0 } }
+    const integral = { ibs: { t: 0, b: 0 }, cbs: { t: 0, b: 0 } }
     for (const g of r.grupos) {
       const ncm = texto(g.ncm) ?? "sem NCM"
       const cclass = texto(g.cclass_calculado)
@@ -72,11 +75,19 @@ export async function montarPrecificacao(calculo: CalculoDetalhe, regime: Recort
       for (const t of ["ibs", "cbs"] as const) {
         const f = fator(cclass, t)
         if (!f) continue
+        const aliq = g[`aliq_${t}_dr`]
+        if (f === 1 && typeof aliq === "number" && aliq > 0) {
+          integral[t].t += aliq * n(g.valor_desonerado_dr)
+          integral[t].b += n(g.valor_desonerado_dr)
+        }
         cheia[t].t += n(g[`valor_${t}_dr`])
         cheia[t].b += n(g.valor_desonerado_dr) * f
       }
     }
-    cheias[ano] = { ibs: cheia.ibs.b > 0 ? cheia.ibs.t / cheia.ibs.b : null, cbs: cheia.cbs.b > 0 ? cheia.cbs.t / cheia.cbs.b : null }
+    // Primeiro a alíquota da API nas vendas de tributação integral; sem elas, tributo ÷ base ajustada.
+    const medir = (t: "ibs" | "cbs") =>
+      integral[t].b > 0 ? integral[t].t / integral[t].b : cheia[t].b > 0 ? cheia[t].t / cheia[t].b : null
+    cheias[ano] = { ibs: medir("ibs"), cbs: medir("cbs") }
   }
 
   const ncms: RefNcm[] = [...porNcm.entries()]

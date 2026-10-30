@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "cclasstrib:atualizar": "node scripts/atualizar-cclasstrib.mjs"
+    "cclasstrib:atualizar": "node scripts/atualizar-cclasstrib.mjs",
+    "ncm:atualizar": "node scripts/atualizar-ncm-restritos.mjs"
   },
   "dependencies": {
     "@pricetax/sdk": "^0.1.0",
