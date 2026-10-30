@@ -1,6 +1,5 @@
 import "server-only"
 import type { Filtros, Metrica, Recorte } from "@pricetax/sdk"
-import tabela from "./cclasstrib.json"
 import type {
   AnaliseClassificacao,
   CelulaCst,
@@ -13,21 +12,9 @@ import type {
   Situacao,
 } from "./classificacao"
 import type { Sentido } from "./catalogo"
+import { CST, FONTE_TABELA, fator, nomeCclass, type Tributo } from "./cclass"
 import { emCache, pricetax } from "./pricetax"
 
-type CClass = { cst: string; nome: string; reducaoIbs: number; reducaoCbs: number; fimVigencia: string | null }
-type Cst = { nome: string; exigeTributo: boolean }
-const CCLASS = tabela.cclass as Record<string, CClass>
-const CST = tabela.cst as Record<string, Cst>
-
-/**
- * CSTs em que o tributo é a alíquota padrão vezes (1 − redução da tabela), ou zero quando o CST
- * não exige tributo. Os demais (alíquota fixa, uniformes, diferimento, suspensão, monofásica,
- * transferência de crédito, ajustes) têm regra própria e ficam fora da estimativa em R$.
- */
-const CST_ESTIMAVEIS = new Set(["000", "200", "222", "400", "410"])
-
-type Tributo = "ibs" | "cbs"
 type Grupo = Record<string, string | number | boolean | null>
 
 const METRICAS = ["itens", "valor_dr", "valor_sem_iva_dr", "valor_ibs_dr", "valor_cbs_dr"] as const satisfies readonly Metrica[]
@@ -35,16 +22,6 @@ const LIMITE = 500
 
 const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0)
 const texto = (v: unknown) => (v === null || v === undefined || v === "" ? null : String(v))
-
-/** Parcela do tributo cheio que a classificação manda pagar (0 a 1), ou null se não é estimável. */
-export function fator(codigo: string | null, tributo: Tributo): number | null {
-  const c = codigo ? CCLASS[codigo] : undefined
-  if (!c || !CST_ESTIMAVEIS.has(c.cst)) return null
-  if (!CST[c.cst]?.exigeTributo) return 0
-  return 1 - (tributo === "ibs" ? c.reducaoIbs : c.reducaoCbs) / 100
-}
-
-export const nomeCclass = (codigo: string | null) => (codigo ? (CCLASS[codigo]?.nome ?? null) : null)
 
 function situacao(nota: string | null, calculado: string | null): Situacao {
   if (!calculado) return "sem_calculo"
@@ -286,7 +263,7 @@ export async function analisarClassificacao(id: string, base: Base): Promise<Ana
     itens,
     fornecedores,
     parcial,
-    tabela: { fonte: tabela.fonte, obtidoEm: tabela.obtidoEm },
+    tabela: FONTE_TABELA,
   }
 }
 

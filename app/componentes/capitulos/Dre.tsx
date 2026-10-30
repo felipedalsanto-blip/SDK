@@ -90,7 +90,7 @@ export function Dre({ calculoId, regime, periodoMeses }: { calculoId: string; re
   const [cenario, setCenario] = useState<string | null>(null)
   const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="cartao vazio">Montando a DRE de 2027 a 2033 nos três cenários…</div>
+  if (!dados) return <div className="cartao vazio">Montando a DRE de 2027 a 2033 em todos os cenários…</div>
 
   const anos = dados.anos
   const escolhido = dados.cenarios.find((c) => c.id === cenario) ?? dados.cenarios.find((c) => c.rotulo === "Com Reajuste") ?? dados.cenarios[0]
@@ -111,7 +111,7 @@ export function Dre({ calculoId, regime, periodoMeses }: { calculoId: string; re
 
   return (
     <div className={carregando ? "carregando" : undefined}>
-      <Capitulo numero="03" titulo="DRE · 2027 a 2033" sub="O efeito do IBS e da CBS na DRE, ano a ano, nos três cenários de preço.">
+      <Capitulo numero="03" titulo="DRE · 2027 a 2033" sub="O efeito do IBS e da CBS na DRE, ano a ano, em cada cenário de preço.">
         <Bloco titulo="Como ler a DRE da reforma">
           <div className="cap-didatico">
             <div>

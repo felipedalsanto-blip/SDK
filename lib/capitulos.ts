@@ -2,6 +2,7 @@ import "server-only"
 import type { CalculoDetalhe, EntradaConsulta, Metrica, Recorte } from "@pricetax/sdk"
 import { numeroCsv, registrosCsv } from "./csv"
 import { emCache, pricetax } from "./pricetax"
+import { lado, receitaLiquidaDe } from "./demonstrativos"
 import { METRICAS_DEBITO, METRICAS_DETALHE, TRIBUTOS } from "./tributos"
 
 /*
@@ -13,6 +14,8 @@ import { METRICAS_DEBITO, METRICAS_DETALHE, TRIBUTOS } from "./tributos"
  * - Cenários de venda: Sem Ajuste = "sem_reajuste" (preço de hoje), Com Reajuste = "base"
  *   (Ajustado: sai o tributo atual, entra o novo, mantida a margem) e Preço Alvo = a margem
  *   criada no app (qualquer cenário com id próprio). Compras sempre no Ajustado.
+ * - Custo Neutro: derivado aqui, não vem da API. É o Com Reajuste com o preço líquido mexido só
+ *   pela variação do custo das compras, para zerar a diferença do lucro bruto (sem despesas).
  */
 
 type Grupo = Record<string, string | number | boolean | null>
@@ -22,7 +25,32 @@ const texto = (v: unknown) => (v === null || v === undefined || v === "" ? null 
 export const ANO_ACAO = 2027
 const MAX_GRUPOS = 2000
 
-export type CenarioVenda = { id: string; nome: string; rotulo: "Sem Ajuste" | "Com Reajuste" | "Preço Alvo" }
+export type CenarioVenda = { id: string; nome: string; rotulo: "Sem Ajuste" | "Com Reajuste" | "Preço Alvo" | "Custo Neutro" }
+
+export const CUSTO_NEUTRO: CenarioVenda = { id: "custo_neutro", nome: "Repassa só a variação do custo das compras", rotulo: "Custo Neutro" }
+
+/** Multiplica pelo fator os valores do lado DR (as chaves que terminam em _dr ou Dr), em qualquer profundidade. */
+export function escalarDr<T>(x: T, k: number): T {
+  if (Array.isArray(x)) return x.map((v) => escalarDr(v, k)) as T
+  if (x && typeof x === "object") {
+    return Object.fromEntries(
+      Object.entries(x).map(([chave, v]) => [chave, typeof v === "number" && /(_dr|Dr|ibsCbs)$/.test(chave) && !/^(aliq|carga)_/.test(chave) ? v * k : escalarDr(v, k)]),
+    ) as T
+  }
+  return x
+}
+
+/**
+ * Fator do Custo Neutro num ano: quanto multiplicar as vendas do Com Reajuste para que a receita
+ * líquida varie exatamente o que variou o custo das compras (lucro bruto igual ao de hoje).
+ * Com Reajuste mantém a receita líquida de hoje; o fator só acrescenta (ou tira) a diferença de custo.
+ */
+function fatorCustoNeutro(vendasBase: Somas, compras: Somas): number {
+  const rlHoje = receitaLiquidaDe(lado(vendasBase, "ar"), false)
+  const rlBase = receitaLiquidaDe(lado(vendasBase, "dr"), true)
+  const alvo = rlHoje + (compras.custo_dr ?? 0) - (compras.custo_ar ?? 0)
+  return rlBase > 0 ? alvo / rlBase : 1
+}
 
 /** Os cenários de venda que o cálculo tem, na ordem do diagnóstico. */
 export function cenariosDeVenda(calculo: CalculoDetalhe): CenarioVenda[] {
@@ -42,7 +70,7 @@ export function anoAcao(calculo: CalculoDetalhe) {
 }
 
 /** Todas as páginas de uma consulta agrupada, até MAX_GRUPOS grupos. */
-async function consultarTudo(id: string, entrada: EntradaConsulta) {
+export async function consultarTudo(id: string, entrada: EntradaConsulta) {
   return emCache(`cap:${id}:${JSON.stringify(entrada)}`, 900, async () => {
     const grupos: Grupo[] = []
     let total = 0
@@ -317,7 +345,16 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
   const id = calculo.id
   const ano = anoAcao(calculo)
   const cenarios = cenariosDeVenda(calculo)
-  const cenario = cenarios.find((c) => c.id === cenarioId) ?? cenarios.find((c) => c.id === "base") ?? cenarios[0]
+  const temBase = cenarios.some((c) => c.id === "base")
+  // Custo Neutro: lê o Com Reajuste e multiplica o lado DR pelo fator do ano.
+  const neutro = cenarioId === CUSTO_NEUTRO.id && temBase
+  const k = temBase
+    ? fatorCustoNeutro(
+        await somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "saida"),
+        await somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "entrada"),
+      )
+    : 1
+  const cenario = neutro ? CUSTO_NEUTRO : (cenarios.find((c) => c.id === cenarioId) ?? cenarios.find((c) => c.id === "base") ?? cenarios[0])
   const recorteDe = (c: string): Recorte => ({ regime, ano, cenario_vendas: c, cenario_compras: "base" })
 
   // Volume por regime do cliente, nos três cenários (uma consulta por cenário).
@@ -355,32 +392,34 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
       { clientes: 0, itens: 0, valorAr: 0, valorDr: 0, tributosAr: 0, tributosDr: 0, ibsCbs: 0 },
     )
     porCenario.push({ ...c, totais, porRegime })
+    if (c.id === "base") porCenario.push(escalarDr({ ...CUSTO_NEUTRO, totais, porRegime }, k))
   }
 
-  const recorte = recorteDe(cenario.id)
+  const recorte = recorteDe(neutro ? "base" : cenario.id)
+  const kLista = neutro ? k : 1
   const base = { recorte, sentido: "saida" as const }
 
   // Custo do cliente: o valor das vendas e cada tributo da nota, para aplicar os créditos de cada perfil.
   const metricasCliente = ["valor_ar", "valor_dr", ...TRIBUTOS.flatMap((t) => [`valor_${t.id}_ar`, `valor_${t.id}_dr`])] as Metrica[]
-  const custoCliente = await emCache(`cap-custo-cliente:${id}:${JSON.stringify(recorte)}`, 900, async () => {
+  const custoCliente = escalarDr(await emCache(`cap-custo-cliente:${id}:${JSON.stringify(recorte)}`, 900, async () => {
     const { grupos } = await pricetax().calculos.consultar(id, { ...base, metricas: metricasCliente })
     const g = grupos[0] ?? {}
     return Object.fromEntries(metricasCliente.map((m) => [m, n(g[m])])) as Record<string, number>
-  })
+  }), kLista)
   const cli = await consultarTudo(id, {
     ...base,
     agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
     metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
-  const clientes: Parceiro[] = cli.grupos.map((g) => ({ ...valores(g), cnpj: texto(g.cnpj_outra_parte), nome: null, regime: texto(g.regime_outra_parte) }))
+  const clientes: Parceiro[] = escalarDr(cli.grupos, kLista).map((g) => ({ ...valores(g), cnpj: texto(g.cnpj_outra_parte), nome: null, regime: texto(g.regime_outra_parte) }))
   const itensG = await consultarTudo(id, {
     ...base,
     agrupar_por: ["descricao_produto", "ncm", "cnpj_outra_parte"],
     metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
-  const itens: Item[] = itensG.grupos.map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: texto(g.cnpj_outra_parte), nome: null }))
+  const itens: Item[] = escalarDr(itensG.grupos, kLista).map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: texto(g.cnpj_outra_parte), nome: null }))
   const ncms = await consultarTudo(id, { ...base, agrupar_por: ["ncm"], metricas: [...METRICAS_COMPRA] })
 
   // Desvios: o mesmo NCM com carga diferente conforme o destino (CFOP) e o regime do cliente.
@@ -423,7 +462,7 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
   const comNome = <T extends { cnpj: string | null; nome: string | null }>(l: T[]) => l.map((x) => ({ ...x, nome: (x.cnpj && nomes.get(x.cnpj)) || null }))
   const rotuloCli = (p: Parceiro) => (p.cnpj && nomes.get(p.cnpj)) || p.cnpj || "Sem CNPJ"
 
-  const ncmLista = ncms.grupos.map((g) => ({ ncm: texto(g.ncm), ...valores(g) }))
+  const ncmLista = escalarDr(ncms.grupos, kLista).map((g) => ({ ncm: texto(g.ncm), ...valores(g) }))
   const grupos = new Map<string, number>()
   for (const x of ncmLista) {
     const cap = x.ncm ? x.ncm.slice(0, 2) : "sem NCM"
@@ -514,6 +553,10 @@ export async function montarTrilha(calculo: CalculoDetalhe, regime: Recorte["reg
     const vendas: Somas[] = []
     for (const ano of anos) vendas.push(await somas(id, { regime, ano, cenario_vendas: c.id, cenario_compras: "base" }, "saida"))
     resultado.push({ ...c, vendas })
+  }
+  const base = resultado.find((c) => c.id === "base")
+  if (base) {
+    resultado.push({ ...CUSTO_NEUTRO, vendas: base.vendas.map((v, i) => escalarDr(v, fatorCustoNeutro(v, compras[i] ?? {}))) })
   }
   return {
     anos,

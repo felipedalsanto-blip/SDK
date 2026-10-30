@@ -10,9 +10,9 @@ import { Diferenca } from "./ui"
  * Hoje (AR) cada perfil credita só os tributos atuais que a lei permite; em 2027 (DR), os que
  * ainda restam e, menos o Simples padrão e a pessoa física, o IBS e a CBS.
  */
-type Perfil = { id: string; grupo: string; nome: string; ar: string[]; dr: string[]; explica: [string, string] }
+export type Perfil = { id: string; grupo: string; nome: string; ar: string[]; dr: string[]; explica: [string, string] }
 
-const PERFIS: Perfil[] = [
+export const PERFIS: Perfil[] = [
   { id: "sn-padrao", grupo: "Simples Nacional", nome: "Simples Nacional (regime padrão)", ar: [], dr: [], explica: ["Não toma crédito.", "Continua sem crédito: o IBS e a CBS viram custo."] },
   { id: "sn-hibrido", grupo: "Simples Nacional", nome: "Simples Nacional (regime híbrido)", ar: [], dr: ["ibs", "cbs"], explica: ["Não toma crédito.", "Recolhe IBS e CBS por fora e passa a creditar os dois."] },
   { id: "lr-ind", grupo: "Lucro Real", nome: "Lucro Real · Indústria (comprar para industrializar/revender)", ar: ["icms", "ipi", "pis_cofins"], dr: ["icms", "ipi", "pis_cofins", "ibs", "cbs"], explica: ["Credita ICMS, IPI, PIS e COFINS.", "Mantém o ICMS da transição e credita IBS e CBS (PIS, COFINS e IPI extintos)."] },
@@ -26,9 +26,9 @@ const PERFIS: Perfil[] = [
 
 const NOME_TRIBUTO = Object.fromEntries(TRIBUTOS.map((t) => [t.id, t.nome]))
 
-type Custo = { valor: number; creditos: { id: string; valor: number }[]; liquido: number }
+export type Custo = { valor: number; creditos: { id: string; valor: number }[]; liquido: number }
 
-function custo(base: Record<string, number>, lado: "ar" | "dr", creditaveis: string[]): Custo {
+export function custo(base: Record<string, number>, lado: "ar" | "dr", creditaveis: string[]): Custo {
   const valor = base[`valor_${lado}`] ?? 0
   const creditos = creditaveis.map((id) => ({ id, valor: base[`valor_${id}_${lado}`] ?? 0 })).filter((c) => Math.abs(c.valor) > 0.005)
   return { valor, creditos, liquido: valor - creditos.reduce((s, c) => s + c.valor, 0) }
@@ -169,7 +169,7 @@ export function CustoCliente({ base, porRegime, ano, calculoId }: { base: Record
   )
 }
 
-function Resumo({ titulo, c, explica, transicao = false }: { titulo: string; c: Custo; explica: string; transicao?: boolean }) {
+export function Resumo({ titulo, c, explica, transicao = false }: { titulo: string; c: Custo; explica: string; transicao?: boolean }) {
   const creditos = c.valor - c.liquido
   return (
     <div className="memoria-coluna">

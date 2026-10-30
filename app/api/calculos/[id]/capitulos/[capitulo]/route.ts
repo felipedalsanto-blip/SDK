@@ -1,5 +1,6 @@
 import type { Recorte } from "@pricetax/sdk"
 import { montarCompras, montarEstorno, montarFicha, montarTrilha, montarVendas } from "@/lib/capitulos"
+import { montarPrecificacao } from "@/lib/precificacao"
 import { ErroDoPainel, lerJson, obterCalculo, rota } from "@/lib/pricetax"
 
 export const dynamic = "force-dynamic"
@@ -29,6 +30,8 @@ export const POST = rota(async (req, { params }: Ctx) => {
       return Response.json(await montarTrilha(calculo, r))
     case "estorno":
       return Response.json(await montarEstorno(calculo, r))
+    case "precificacao":
+      return Response.json(await montarPrecificacao(calculo, r))
     case "ficha": {
       const tipo = corpo.tipo === "item" ? "item" : "parceiro"
       const sentido = corpo.sentido === "saida" ? "saida" : "entrada"

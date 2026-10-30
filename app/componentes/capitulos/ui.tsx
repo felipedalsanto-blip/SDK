@@ -6,12 +6,13 @@ import { TRIBUTOS } from "@/lib/tributos"
 import { fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, fmtPct, useLargura, variacao } from "../util"
 import { useAbrirFicha } from "./ficha-contexto"
 
-/** Cores fixas: AR (hoje) em cinza; os três cenários de venda em preto, amarelo e cinza médio. */
+/** Cores fixas: AR (hoje) em cinza; os cenários de venda em preto, amarelo, cinza médio e azul (Custo Neutro). */
 export const COR_AR = "var(--pt-cinza)"
 export const COR_CENARIO: Record<string, string> = {
   "Sem Ajuste": "var(--pt-preto)",
   "Com Reajuste": "var(--pt-amarelo)",
   "Preço Alvo": "var(--pt-cinza-medio)",
+  "Custo Neutro": "var(--accent)",
 }
 
 /* ───────── Expandir e recolher: comando do capítulo que todas as tabelas obedecem ───────── */

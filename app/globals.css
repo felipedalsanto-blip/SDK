@@ -465,3 +465,28 @@ main > *, .cap > *, .cap-bloco > * { min-width: 0; }
 .tema button { border: 0; background: transparent; color: #c9c9c9; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .tema button[aria-pressed="true"] { background: var(--pt-amarelo); color: #1a1a1a; }
 .tema button:focus-visible { outline: 2px solid var(--pt-amarelo); outline-offset: 1px; }
+
+/* Novo produto: formação de preço. */
+.np-campos { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; }
+.np-campos label, .np-rotulo { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-secondary); min-width: 0; }
+.np-campos input:not([type="checkbox"]), .np-campos select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); font: inherit; font-weight: 400; color: var(--text-primary); min-width: 0; }
+.np-campos input[type="number"] { width: 130px; text-align: right; }
+.np-campos .np-largo { flex: 1 1 320px; }
+.np-campos .np-largo select, .np-campos .np-largo input { width: 100%; }
+.np-check { display: flex !important; grid-auto-flow: column; align-items: center; gap: 8px !important; font-weight: 500 !important; }
+.np-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.np-acoes button, .np-chips button { border: 1px solid var(--border); background: var(--surface-1); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; }
+.np-acoes button:hover, .np-chips button:hover { border-color: var(--text-primary); }
+.np-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: var(--text-secondary); }
+.np-chips button[aria-pressed="true"] { background: var(--pt-amarelo); color: #1a1a1a; border-color: var(--pt-amarelo); }
+.np-ref { font-size: 13px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border-left: 4px solid var(--pt-cinza-medio); }
+.np-ref.ok { border-left-color: var(--pt-amarelo); }
+.np-beneficio { display: grid; gap: 3px; font-size: 13px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); border-left: 4px solid var(--pt-cinza-medio); }
+.np-beneficio.sim { border-left-color: var(--pt-amarelo); background: color-mix(in srgb, var(--pt-amarelo) 10%, var(--surface-1)); }
+.np-nota code { font-size: 12px; color: var(--text-secondary); }
+.np-nota tr.np-total td { font-weight: 800; border-top: 2px solid var(--text-primary); }
+tr.np-atual td { background: color-mix(in srgb, var(--pt-amarelo) 14%, transparent); font-weight: 600; }
+.np-link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-size: inherit; }
+.np-aviso { padding: 10px 12px; border-radius: 10px; background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--text-primary); }
+.memoria-aliq { color: var(--text-muted); font-size: 11.5px; }
+@media (max-width: 720px) { .np-campos input[type="number"] { width: 100%; } .np-campos label { flex: 1 1 140px; } }

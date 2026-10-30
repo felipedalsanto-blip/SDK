@@ -35,6 +35,12 @@ export function colunas(t: Trilha, cenarioId: string): Colunas {
 
 const v0 = (s: Somas, k: string) => s[k] ?? 0
 const ibsCbs = (s: Somas, prefixo: string) => v0(s, `${prefixo}_ibs`) + v0(s, `${prefixo}_cbs`)
+
+/** Receita bruta das vendas (já no lado AR ou DR): no DR, sem o IBS e a CBS cobrados por fora. */
+const receitaBrutaDe = (vendas: Somas, dr: boolean) => (dr ? v0(vendas, "valor_sem_iva") : v0(vendas, "valor"))
+/** Deduções: os tributos atuais destacados nas vendas (IBS e CBS ficam fora da receita). */
+const deducoesDe = (vendas: Somas) => Math.max(0, v0(vendas, "debito") - ibsCbs(vendas, "debito"))
+export const receitaLiquidaDe = (vendas: Somas, dr: boolean) => receitaBrutaDe(vendas, dr) - deducoesDe(vendas)
 const atuais = TRIBUTOS.filter((t) => t.id !== "ibs" && t.id !== "cbs")
 
 /** Linhas por tributo, com uma linha de ajuste quando a soma não fecha com o total. */
@@ -81,8 +87,8 @@ function calcularIr(p: PremissasIr, receitaBruta: number, receitaLiquida: number
 
 export function montarDre(t: Trilha, cenarioId: string, premissas?: PremissasIr): Linha[] {
   const cols = colunas(t, cenarioId)
-  const receitaBruta = (c: Colunas[number]) => (c.dr ? v0(c.vendas, "valor_sem_iva") : v0(c.vendas, "valor"))
-  const deducoes = (c: Colunas[number]) => Math.max(0, v0(c.vendas, "debito") - ibsCbs(c.vendas, "debito"))
+  const receitaBruta = (c: Colunas[number]) => receitaBrutaDe(c.vendas, c.dr)
+  const deducoes = (c: Colunas[number]) => deducoesDe(c.vendas)
   const receitaLiquida = (c: Colunas[number]) => receitaBruta(c) - deducoes(c)
   const custos = (c: Colunas[number]) => v0(c.compras, "custo")
   const lucro = (c: Colunas[number]) => receitaLiquida(c) - custos(c)

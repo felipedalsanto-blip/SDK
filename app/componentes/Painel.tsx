@@ -16,6 +16,7 @@ import { VisaoClassificacao } from "./VisaoClassificacao"
 import { Compras } from "./capitulos/Compras"
 import { Dre } from "./capitulos/Dre"
 import { Fluxo } from "./capitulos/Fluxo"
+import { NovoProduto } from "./capitulos/NovoProduto"
 import { Vendas } from "./capitulos/Vendas"
 import { Erro, rotuloValor } from "./comum"
 
@@ -192,7 +193,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
     filtro,
   }
   const chave = JSON.stringify(selecao)
-  const capitulo = aba === "compras" || aba === "vendas" || aba === "dre" || aba === "fluxo"
+  const capitulo = aba === "compras" || aba === "vendas" || aba === "dre" || aba === "fluxo" || aba === "novo"
   const chaveSerie = JSON.stringify({ ...selecao, recorte: { ...selecao.recorte, ano: null } })
 
   return (
@@ -273,7 +274,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
           )}
           {capitulo && (
             <p className="sub" style={{ alignSelf: "center", margin: 0 }}>
-              Compras e listas de vendas em 2027 (o ano das ações); DRE e fluxo de caixa de 2027 a 2033, nos três cenários de venda.
+              Compras e listas de vendas em 2027 (o ano das ações); DRE e fluxo de caixa de 2027 a 2033, em todos os cenários de venda.
             </p>
           )}
           {!capitulo && filtro && (
@@ -303,6 +304,8 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
         <Dre calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} />
       ) : aba === "fluxo" ? (
         <Fluxo calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} />
+      ) : aba === "novo" ? (
+        <NovoProduto calculoId={calculo.id} regime={regime} />
       ) : aba === "geral" ? (
         <>
           <Resumo calculoId={calculo.id} selecao={selecao} chave={chave} />
@@ -338,6 +341,7 @@ const ABAS = {
   vendas: "Vendas",
   dre: "DRE",
   fluxo: "Fluxo de caixa",
+  novo: "Novo produto",
   geral: "Visão geral",
   classificacao: "Classificação CST / cClassTrib",
 } as const

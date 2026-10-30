@@ -44,13 +44,13 @@ export function Fluxo({ calculoId, regime, periodoMeses }: { calculoId: string; 
 
         <Bloco
           titulo="Recebimento de clientes: o preço de venda, já com IBS e CBS"
-          leitura="Aqui os três cenários se separam: a distância de cada linha até a tracejada mostra quanto o preço precisa subir (ou pode cair) em cada caminho."
+          leitura="Aqui os cenários se separam: a distância de cada linha até a tracejada mostra quanto o preço precisa subir (ou pode cair) em cada caminho."
         >
           <LinhasAno anos={anos} ar={ar("cli")} series={series("cli")} />
         </Bloco>
 
         <div className="grade-2">
-          <Bloco titulo="Pagamento a fornecedores" leitura="Igual nos três cenários de venda: as compras não mudam com o preço de venda.">
+          <Bloco titulo="Pagamento a fornecedores" leitura="Igual em todos os cenários de venda: as compras não mudam com o preço de venda.">
             <LinhasAno
               anos={anos}
               ar={ar("forn", -1)}

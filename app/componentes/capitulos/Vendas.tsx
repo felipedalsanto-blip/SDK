@@ -18,6 +18,8 @@ const EXPLICA: Record<string, string> = {
     "O cenário conservador: tira do preço os tributos atuais, inclui os novos e os que permanecem, sem considerar o que muda no custo das compras.",
   "Preço Alvo":
     "Além de trocar os tributos, usa os novos créditos das compras, que podem baixar o custo e reduzir a necessidade de aumento de preço.",
+  "Custo Neutro":
+    "Repassa ao preço só o que o custo das compras sobe ou cai, para o lucro bruto ficar igual ao de hoje, sem olhar despesas. Mostra o quanto a venda precisa ser mais (ou pode ser menos) eficiente por causa do custo.",
 }
 
 export function Vendas({ calculoId, regime }: { calculoId: string; regime: string }) {
@@ -31,7 +33,7 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
   )
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="cartao vazio">Lendo as vendas de 2027 nos três cenários…</div>
+  if (!dados) return <div className="cartao vazio">Lendo as vendas de 2027 em todos os cenários…</div>
   const atual = dados.cenarios.find((c) => c.id === dados.cenario.id) ?? dados.cenarios[0]
   const sobe = sentido === "aumento"
   const p = dados.pareto
@@ -39,8 +41,8 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
   return (
     <ProvedorFicha calculoId={calculoId} regime={regime} sentido="saida" cenario={dados.cenario.id}>
     <div className={carregando ? "carregando" : undefined}>
-      <Capitulo numero="02" titulo={`Vendas · ${dados.ano}`} sub="Três caminhos de preço para 2027 e o que cada um faz com o resultado.">
-        <Bloco titulo="Os três cenários de preço" leitura="Escolha um cenário para ver as listas e os padrões logo abaixo.">
+      <Capitulo numero="02" titulo={`Vendas · ${dados.ano}`} sub="Os caminhos de preço para 2027 e o que cada um faz com o resultado.">
+        <Bloco titulo="Os cenários de preço" leitura="Escolha um cenário para ver as listas e os padrões logo abaixo.">
           <div className="cap-cenarios">
             {dados.cenarios.map((c) => (
               <button key={c.id} className="cap-cenario" aria-pressed={c.id === dados.cenario.id} onClick={() => setCenario(c.id)}>
@@ -60,6 +62,12 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
           </div>
           {dados.cenarios.every((c) => c.rotulo !== "Preço Alvo") && (
             <p className="cap-nota">O cenário Preço Alvo não foi criado neste cálculo. Crie a margem no app da Pricetax para ele aparecer aqui.</p>
+          )}
+          {atual?.rotulo === "Custo Neutro" && (
+            <div className="cap-atencao">
+              <b>Como ler.</b> Cenário montado no painel: o Com Reajuste com o preço líquido mexido só pela variação do custo das compras de {dados.ano}. O
+              lucro bruto fica igual ao de hoje; as despesas não entram na conta. A ficha de cada cliente ou item mostra a memória do Com Reajuste.
+            </div>
           )}
           {atual?.rotulo === "Com Reajuste" && (
             <div className="cap-atencao">
