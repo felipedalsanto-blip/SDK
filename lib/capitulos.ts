@@ -217,7 +217,9 @@ export function descricaoGenerica(d: string | null): boolean {
   const t = normalizar(d)
   if (t.length < 5 || /^[0-9 ]+$/.test(t)) return true
   const semNumeros = t.replace(/[0-9]+/g, " ").replace(/\s+/g, " ").trim()
-  return GENERICAS.includes(semNumeros) || semNumeros.split(" ").every((p) => p.length <= 2 || GENERICAS.includes(p))
+  // Abreviações ("PA SX MA 8.8 X 120") identificam o item: só é genérica a descrição feita só de palavras genéricas.
+  const palavras = semNumeros.split(" ").filter((p) => p.length > 1 && p !== "x")
+  return GENERICAS.includes(semNumeros) || (palavras.length > 0 && palavras.every((p) => GENERICAS.includes(p)))
 }
 const ncmAusente = (ncm: string | null) => !ncm || !/^\d{8}$/.test(ncm) || /^0+$/.test(ncm)
 
