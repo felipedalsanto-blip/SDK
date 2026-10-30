@@ -2,6 +2,7 @@ import "server-only"
 import type { CalculoDetalhe, Recorte } from "@pricetax/sdk"
 import { numeroCsv, registrosCsv } from "./csv"
 import { emCache, pricetax } from "./pricetax"
+import { tipoDaLinha } from "./tipos"
 
 /*
  * IPI e ICMS ESTIMADOS: quando o documento não destaca o tributo (revenda de distribuidor, compra do
@@ -30,6 +31,7 @@ type Lado = {
   porNcm: Map<string, Ajuste>
   porDescricao: Map<string, Ajuste>
   porItem: Map<string, Ajuste>
+  porTipo: Map<string, Ajuste>
 }
 export type Estimados = { entrada: Lado; saida: Lado }
 
@@ -45,6 +47,7 @@ const vazio = (): Lado => ({
   porNcm: new Map(),
   porDescricao: new Map(),
   porItem: new Map(),
+  porTipo: new Map(),
 })
 
 function somar(alvo: Ajuste, d: Ajuste) {
@@ -134,6 +137,7 @@ export function lerEstimados(calculo: CalculoDetalhe, regime: Recorte["regime"],
       noMapa(lado.porNcm, r.ncm ?? "", d)
       noMapa(lado.porDescricao, r.descricao_produto ?? "", d)
       noMapa(lado.porItem, chaveItem(r.descricao_produto ?? "", r.ncm ?? "", r.cnpj_outra_parte ?? ""), d)
+      noMapa(lado.porTipo, tipoDaLinha(r.tipo_linha, r.tipo_operacao), d)
     }
     return res
   })
@@ -165,4 +169,5 @@ export const chaves = {
   regime: (g: Grupo) => texto(g.regime_outra_parte),
   ncm: (g: Grupo) => texto(g.ncm),
   item: (g: Grupo) => chaveItem(texto(g.descricao_produto), texto(g.ncm), texto(g.cnpj_outra_parte)),
+  tipo: (g: Grupo) => tipoDaLinha(g.tipo_linha, g.tipo_operacao),
 }

@@ -1,6 +1,6 @@
 "use client"
 import { createContext, Fragment, useContext, useEffect, useState } from "react"
-import type { Item, Pareto as DadosPareto, Parceiro } from "@/lib/capitulos"
+import type { Item, Pareto as DadosPareto, Parceiro, PorTipo } from "@/lib/capitulos"
 import type { Linha } from "@/lib/demonstrativos"
 import { TRIBUTOS } from "@/lib/tributos"
 import { fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, fmtPct, useLargura, variacao } from "../util"
@@ -238,6 +238,82 @@ export function TabelaParceiros({
                 <CelulasExtras cols={extras} extras={p.extras} />
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+/**
+ * Totais por tipo de operação (produto, serviço, locação de imóvel e de móvel), com as mesmas colunas
+ * e grupos que expandem das listas de fornecedores e clientes, a participação no total e a linha de total.
+ */
+export function TabelaTipos({
+  lista,
+  mostrarCusto = true,
+  grupos = ["impostos", "creditos"],
+}: {
+  lista: PorTipo[]
+  mostrarCusto?: boolean
+  grupos?: GrupoColuna[]
+}) {
+  const [niveis, setNiveis] = useNiveis(grupos)
+  const total = lista.reduce(
+    (t, x) => {
+      const extras = { ...t.extras }
+      for (const [m, v] of Object.entries(x.extras)) extras[m] = (extras[m] ?? 0) + v
+      return { itens: t.itens + x.itens, valorAr: t.valorAr + x.valorAr, valorDr: t.valorDr + x.valorDr, custoAr: t.custoAr + x.custoAr, custoDr: t.custoDr + x.custoDr, extras }
+    },
+    { itens: 0, valorAr: 0, valorDr: 0, custoAr: 0, custoDr: 0, extras: {} as Record<string, number> },
+  )
+  const extras = colunasExtras(niveis, grupos, lista)
+  const linha = (nome: React.ReactNode, x: Omit<PorTipo, "tipo" | "nome">, classe?: string, chave?: string) => (
+    <tr key={chave} className={classe}>
+      <td className="texto">{nome}</td>
+      <td className="num">{fmtInt(x.itens)}</td>
+      <td className="num">{total.valorAr ? fmtPct(x.valorAr / total.valorAr) : "—"}</td>
+      <td className="num">{fmtBRL(x.valorAr)}</td>
+      <td className="num">{fmtBRL(x.valorDr)}</td>
+      <td className="num">
+        <Diferenca valor={x.valorDr - x.valorAr} /> <Seta antes={x.valorAr} depois={x.valorDr} />
+      </td>
+      {mostrarCusto && <td className="num">{fmtBRL(x.custoAr)}</td>}
+      {mostrarCusto && <td className="num">{fmtBRL(x.custoDr)}</td>}
+      {mostrarCusto && (
+        <td className="num">
+          <Diferenca valor={x.custoDr - x.custoAr} />
+        </td>
+      )}
+      <CelulasExtras cols={extras} extras={x.extras} />
+    </tr>
+  )
+  return (
+    <>
+      <SeletorGrupos grupos={grupos} niveis={niveis} setNiveis={setNiveis} />
+      <div className="tabela-rolagem">
+        <table className="cap-tabela cap-tipos">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th className="num">Itens</th>
+              <th className="num">% do valor</th>
+              <th className="num">Valor AR</th>
+              <th className="num">Valor DR</th>
+              <th className="num">Diferença</th>
+              {mostrarCusto && <th className="num">Custo AR</th>}
+              {mostrarCusto && <th className="num">Custo DR</th>}
+              {mostrarCusto && <th className="num">Dif. custo</th>}
+              {extras.map((c) => (
+                <th key={c.id} className={`num cap-col-${c.grupo}`}>
+                  {c.nome}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((x) => linha(<b>{x.nome}</b>, x, x.itens === 0 ? "cap-tipo-vazio" : undefined, x.tipo))}
+            {linha(<b>Total</b>, total, "cap-tipos-total", "total")}
           </tbody>
         </table>
       </div>

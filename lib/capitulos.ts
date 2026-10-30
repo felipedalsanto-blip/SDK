@@ -5,6 +5,7 @@ import { emCache, pricetax } from "./pricetax"
 import { lado, receitaLiquidaDe } from "./demonstrativos"
 import { chaveItem, chaves, lerEstimados, semEstimados, somaSemEstimados, type Ajuste, type Estimados, type ResumoEstimado } from "./estimados"
 import { METRICAS_DEBITO, METRICAS_DETALHE, TRIBUTOS } from "./tributos"
+import { TIPOS_LINHA, nomeTipo, tipoDaLinha } from "./tipos"
 
 /*
  * Os quatro capítulos do Diagnóstico da Reforma (Compras, Vendas, DRE e Fluxo de Caixa),
@@ -128,6 +129,29 @@ export type Valores = {
 export type PorRegime = Valores & { regime: string | null; nome: string; parceiros: number; creditoAr: number; creditoDr: number }
 export type Parceiro = Valores & { cnpj: string | null; nome: string | null; regime: string | null }
 export type Item = Valores & { descricao: string | null; ncm: string | null; cnpj: string | null; nome: string | null }
+/** Total de um tipo de operação (produto, serviço, locação de imóvel ou de móvel). */
+export type PorTipo = Valores & { tipo: string; nome: string }
+
+/** Soma os grupos (tipo de linha × tipo de operação) nas quatro categorias; as quatro aparecem sempre. */
+function totaisPorTipo(grupos: Grupo[]): PorTipo[] {
+  const mapa = new Map<string, PorTipo>()
+  const zero = (tipo: string): PorTipo => ({ tipo, nome: nomeTipo(tipo), itens: 0, valorAr: 0, valorDr: 0, custoAr: 0, custoDr: 0, extras: {} })
+  for (const t of TIPOS_LINHA) mapa.set(t, zero(t))
+  for (const g of grupos) {
+    const k = tipoDaLinha(g.tipo_linha, g.tipo_operacao)
+    const alvo = mapa.get(k) ?? zero(k)
+    const v = valores(g)
+    alvo.itens += v.itens
+    alvo.valorAr += v.valorAr
+    alvo.valorDr += v.valorDr
+    alvo.custoAr += v.custoAr
+    alvo.custoDr += v.custoDr
+    for (const [m, x] of Object.entries(v.extras)) alvo.extras[m] = (alvo.extras[m] ?? 0) + x
+    mapa.set(k, alvo)
+  }
+  return [...mapa.values()]
+}
+
 export type FatiaPareto = { chave: string; rotulo: string; valor: number; acumulado: number }
 export type Pareto = { fatias: FatiaPareto[]; total: number; para80: number; universo: number }
 
@@ -241,6 +265,7 @@ export type Compras = {
     custoCaiNcm: Pareto
   }
   qualidade: Qualidade
+  porTipo: PorTipo[]
   /** IPI e ICMS estimados na cadeia (não destacados no documento) e se o efeito deles foi retirado. */
   estimados: { resumo: ResumoEstimado; excluidos: boolean }
   parcial: boolean
@@ -259,6 +284,8 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
     agrupar_por: ["regime_outra_parte"],
     metricas: [...METRICAS_COMPRA, "parceiros_distintos", "credito_ar", "credito_dr"],
   })
+  const tipos = await consultarTudo(id, { ...base, agrupar_por: ["tipo_linha", "tipo_operacao"], metricas: METRICAS_LISTA })
+  const porTipo = totaisPorTipo(aj(tipos.grupos, est.porTipo, chaves.tipo))
   const porRegime: PorRegime[] = aj(regimes.grupos, est.porRegime, chaves.regime)
     .map((g) => ({
       ...valores(g),
@@ -363,6 +390,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
       custoCaiFornecedor: pareto(parceiros.map((p) => ({ chave: String(p.cnpj), rotulo: rotuloForn(p), valor: -difCusto(p) }))),
       custoCaiNcm: pareto(ncmLista.map((x) => ({ chave: String(x.ncm), rotulo: x.ncm ?? "Sem NCM", valor: -difCusto(x) }))),
     },
+    porTipo,
     qualidade: {
       ...qualidadeBruta,
       semNcm: { ...qualidadeBruta.semNcm, exemplos: comNome(qualidadeBruta.semNcm.exemplos) },
@@ -405,6 +433,7 @@ export type Vendas = {
   desvios: Desvio[]
   /** Valor das vendas e tributo de cada item (AR e DR), base do custo do cliente por perfil. */
   custoCliente: Record<string, number>
+  porTipo: PorTipo[]
   estimados: { resumo: ResumoEstimado; excluidos: boolean }
   pareto: { precoSobeCliente: Pareto; precoSobeNcm: Pareto; precoSobeGrupo: Pareto; precoCaiCliente: Pareto; precoCaiNcm: Pareto }
   parcial: boolean
@@ -496,6 +525,8 @@ export async function montarVendas(
     const g = grupos[0] ?? {}
     return Object.fromEntries(metricasCliente.map((m) => [m, n(g[m])])) as Record<string, number>
   }).then((c) => (sem ? somaSemEstimados(c, est.total) : c)), kLista)
+  const tipos = await consultarTudo(id, { ...base, agrupar_por: ["tipo_linha", "tipo_operacao"], metricas: METRICAS_LISTA })
+  const porTipo = totaisPorTipo(escalarDr(aj(tipos.grupos, est.porTipo, chaves.tipo), kLista))
   const cli = await consultarTudo(id, {
     ...base,
     agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
@@ -568,6 +599,7 @@ export async function montarVendas(
     simples: { aumento: comNome(listas.simples.aumento), reducao: comNome(listas.simples.reducao) },
     desvios: desvios.slice(0, 15),
     custoCliente,
+    porTipo,
     estimados: { resumo: est.resumo, excluidos: sem },
     pareto: {
       precoSobeCliente: pareto(clientes.map((p) => ({ chave: String(p.cnpj), rotulo: rotuloCli(p), valor: difPreco(p) }))),

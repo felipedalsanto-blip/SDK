@@ -130,3 +130,7 @@ A chave **Tributos estimados (IPI e ICMS) · Incluir / Excluir** no topo mostra 
 ## Aviso de qualidade da base (Compras)
 
 Ao fim de Compras, um aviso mostra quanto do valor comprado está em itens sem NCM (ou NCM inválido), com descrição genérica ("diversos", "material de consumo"…) ou com a mesma descrição em 3 ou mais NCMs, e quais são os maiores. Acima de 10% do valor vira atenção; acima de 30%, crítico.
+
+## Totais por tipo (Compras e Vendas)
+
+Antes das tabelas por regime, Compras e Vendas abrem com o total por **produto, serviço, locação de bem imóvel e locação de bem móvel**, com as mesmas colunas das listas (valor, custo e impostos/créditos que expandem até o tributo), a participação no valor e a linha de total. A categoria vem do tipo de linha e do tipo de operação do cálculo (`lib/tipos.ts`); um tipo fora das quatro aparece com o próprio nome. Respeita o ano, o cenário de venda e a chave de tributos estimados.

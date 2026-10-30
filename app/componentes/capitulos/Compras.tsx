@@ -6,7 +6,7 @@ import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { Explorador } from "./Explorador"
 import { AvisoEstimados } from "./Estimados"
 import { ProvedorFicha } from "./Ficha"
-import { Alternar, Bloco, Capitulo, Diferenca, Indicador, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
+import { Alternar, Bloco, Capitulo, Diferenca, Indicador, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros, TabelaTipos } from "./ui"
 
 type Sentido = "aumento" | "reducao"
 const SENTIDOS: Record<Sentido, string> = { aumento: "Quem aumenta", reducao: "Quem reduz" }
@@ -65,6 +65,13 @@ export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: s
         </div>
 
         <AvisoEstimados resumo={dados.estimados.resumo} excluidos={dados.estimados.excluidos} lado="compras" />
+
+        <Bloco
+          titulo="Compras por tipo: produto, serviço e locação"
+          leitura="O total das compras separado pelo que foi comprado. Abra impostos e créditos por tributo como nas outras tabelas."
+        >
+          <TabelaTipos lista={dados.porTipo} />
+        </Bloco>
 
         <Bloco
           titulo="Compras por regime tributário do fornecedor"

@@ -7,7 +7,7 @@ import { CustoCliente } from "./CustoCliente"
 import { Explorador } from "./Explorador"
 import { AvisoEstimados } from "./Estimados"
 import { ProvedorFicha } from "./Ficha"
-import { Alternar, Bloco, COR_CENARIO, Capitulo, Diferenca, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
+import { Alternar, Bloco, COR_CENARIO, Capitulo, Diferenca, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros, TabelaTipos } from "./ui"
 
 type Sentido = "aumento" | "reducao"
 const TOPS = { "10": "Top 10", "20": "Top 20", "30": "Top 30", "40": "Top 40", "50": "Top 50" }
@@ -79,6 +79,13 @@ export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: st
         </Bloco>
 
         <AvisoEstimados resumo={dados.estimados.resumo} excluidos={dados.estimados.excluidos} lado="vendas" />
+
+        <Bloco
+          titulo={`Vendas por tipo: produto, serviço e locação · ${dados.cenario.rotulo}`}
+          leitura="O total das vendas separado pelo que foi vendido, no cenário escolhido. Abra os impostos por tributo como nas outras tabelas."
+        >
+          <TabelaTipos lista={dados.porTipo} mostrarCusto={false} grupos={["impostos"]} />
+        </Bloco>
 
         {atual && (
           <Bloco
