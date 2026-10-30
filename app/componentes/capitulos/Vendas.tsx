@@ -3,6 +3,7 @@ import { useState } from "react"
 import type { Vendas as Dados } from "@/lib/capitulos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
+import { Explorador } from "./Explorador"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Diferenca, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
 
 type Sentido = "aumento" | "reducao"
@@ -120,18 +121,18 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
           titulo={`Top ${quantidade} clientes com ${sobe ? "aumento" : "redução"} no preço de venda`}
           leitura={sobe ? "Os clientes que mais vão sentir o novo preço. A conversa precisa chegar antes da nota." : "Clientes em que o preço cai: espaço para recuperar margem ou ganhar mercado."}
         >
-          <TabelaParceiros lista={dados.clientes[sentido]} mostrarCusto={false} vazio="Nenhum cliente nesta situação." />
+          <TabelaParceiros lista={dados.clientes[sentido]} mostrarCusto={false} grupos={["impostos"]} vazio="Nenhum cliente nesta situação." />
         </Bloco>
 
         <Bloco titulo={`Top ${quantidade} itens com ${sobe ? "aumento" : "redução"} no preço de venda`} leitura="Cada item vem com o cliente que o compra.">
-          <TabelaItens lista={dados.itens[sentido]} parceiro="Cliente" mostrarCusto={false} vazio="Nenhum item nesta situação." />
+          <TabelaItens lista={dados.itens[sentido]} parceiro="Cliente" mostrarCusto={false} grupos={["impostos"]} vazio="Nenhum item nesta situação." />
         </Bloco>
 
         <Bloco
           titulo={`Top ${quantidade} clientes do Simples Nacional com ${sobe ? "aumento" : "redução"} no preço`}
           leitura="Para o cliente do Simples, o IBS e a CBS em regra não voltam como crédito: o preço que sobe é custo que sobe para ele. É o cliente mais sensível ao reajuste."
         >
-          <TabelaParceiros lista={dados.simples[sentido]} mostrarCusto={false} vazio="Nenhum cliente do Simples Nacional nesta situação." />
+          <TabelaParceiros lista={dados.simples[sentido]} mostrarCusto={false} grupos={["impostos"]} vazio="Nenhum cliente do Simples Nacional nesta situação." />
         </Bloco>
 
         <Bloco
@@ -199,6 +200,13 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
               )}
             </div>
           </div>
+        </Bloco>
+
+        <Bloco
+          titulo="Monte a sua visão"
+          leitura={`Nasce por item e cliente, no cenário ${dados.cenario.rotulo}. Troque os agrupadores (NCM, CFOP, regime do cliente…), abra impostos e débitos por tributo e baixe em CSV.`}
+        >
+          <Explorador calculoId={calculoId} regime={regime} sentido="saida" cenario={dados.cenario.id} />
         </Bloco>
 
         <Bloco titulo="Plano comercial" leitura="Do ponto de vista da empresa que vende. Comece pelos clientes do Pareto.">

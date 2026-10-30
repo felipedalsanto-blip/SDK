@@ -7,6 +7,8 @@
 - **DRE 2027 a 2033:** até o lucro bruto, nos três cenários, explicando a saída do IBS e da CBS da receita bruta e dos custos.
 - **Fluxo de caixa 2027 a 2033:** fornecedores contra hoje; clientes, tributo recolhido e variação de caixa nos três cenários; estorno de débito (tributo destacado menos devido) e estorno de crédito (aproximado) perdendo força até 2033.
 
+Em todas as tabelas, os grupos **Impostos** e **Créditos** expandem (totais AR × DR e por tributo: ICMS, ICMS-ST, DIFAL, ISS, IPI, PIS/COFINS, IBS e CBS), com "Expandir tudo" e "Recolher tudo" por tabela e por capítulo. Compras e Vendas têm o **Monte a sua visão** (agrupadores e colunas à escolha, ordenação, paginação e CSV). DRE e fluxo de caixa saem no formato de demonstrativo, com linhas que abrem até o tributo, e gráficos em linha.
+
 Fora do alcance da API: despesas operacionais, IR e CSLL (a DRE vai até o lucro bruto) e a UF de destino (o destino é lido pelo CFOP).
 
 

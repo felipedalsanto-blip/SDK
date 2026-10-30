@@ -2,6 +2,7 @@ import "server-only"
 import type { CalculoDetalhe, EntradaConsulta, Metrica, Recorte } from "@pricetax/sdk"
 import { numeroCsv, registrosCsv } from "./csv"
 import { emCache, pricetax } from "./pricetax"
+import { METRICAS_DEBITO, METRICAS_DETALHE } from "./tributos"
 
 /*
  * Os quatro capítulos do Diagnóstico da Reforma (Compras, Vendas, DRE e Fluxo de Caixa),
@@ -84,7 +85,15 @@ export const nomeRegime = (r: string | null) => (r ? (NOMES_REGIME[r] ?? r) : "N
 
 /* ───────────────────────────── COMPRAS 2027 ───────────────────────────── */
 
-export type Valores = { itens: number; valorAr: number; valorDr: number; custoAr: number; custoDr: number }
+export type Valores = {
+  itens: number
+  valorAr: number
+  valorDr: number
+  custoAr: number
+  custoDr: number
+  /** Impostos e créditos, totais e por tributo (AR e DR), para as colunas que expandem. */
+  extras: Record<string, number>
+}
 export type PorRegime = Valores & { regime: string | null; nome: string; parceiros: number; creditoAr: number; creditoDr: number }
 export type Parceiro = Valores & { cnpj: string | null; nome: string | null; regime: string | null }
 export type Item = Valores & { descricao: string | null; ncm: string | null; cnpj: string | null; nome: string | null }
@@ -99,7 +108,9 @@ const valores = (g: Grupo): Valores => ({
   valorDr: n(g.valor_dr),
   custoAr: n(g.custo_ar),
   custoDr: n(g.custo_dr),
+  extras: Object.fromEntries(METRICAS_DETALHE.filter((m) => m in g).map((m) => [m, n(g[m])])),
 })
+const METRICAS_LISTA = [...METRICAS_COMPRA, ...METRICAS_DETALHE]
 
 /** Ordena por uma diferença e fica com os N maiores (aumento) ou menores (redução). */
 function topo<T>(lista: T[], dif: (x: T) => number, sentido: "aumento" | "reducao", qtd: number) {
@@ -126,7 +137,7 @@ function pareto(lista: { chave: string; rotulo: string; valor: number }[], mostr
 export type Compras = {
   ano: number
   cenario: string
-  totais: Valores & { fornecedores: number; creditoAr: number; creditoDr: number }
+  totais: Omit<Valores, "extras"> & { fornecedores: number; creditoAr: number; creditoDr: number }
   porRegime: PorRegime[]
   fornecedores: { aumento: Parceiro[]; reducao: Parceiro[] }
   itens: { aumento: Item[]; reducao: Item[] }
@@ -166,7 +177,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
   const forn = await consultarTudo(id, {
     ...base,
     agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
-    metricas: [...METRICAS_COMPRA],
+    metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
   const parceiros: Parceiro[] = forn.grupos.map((g) => ({
@@ -179,7 +190,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
   const itensG = await consultarTudo(id, {
     ...base,
     agrupar_por: ["descricao_produto", "ncm", "cnpj_outra_parte"],
-    metricas: [...METRICAS_COMPRA],
+    metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
   const itens: Item[] = itensG.grupos.map((g) => ({
@@ -349,14 +360,14 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
   const cli = await consultarTudo(id, {
     ...base,
     agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
-    metricas: [...METRICAS_COMPRA],
+    metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
   const clientes: Parceiro[] = cli.grupos.map((g) => ({ ...valores(g), cnpj: texto(g.cnpj_outra_parte), nome: null, regime: texto(g.regime_outra_parte) }))
   const itensG = await consultarTudo(id, {
     ...base,
     agrupar_por: ["descricao_produto", "ncm", "cnpj_outra_parte"],
-    metricas: [...METRICAS_COMPRA],
+    metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
   const itens: Item[] = itensG.grupos.map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: texto(g.cnpj_outra_parte), nome: null }))
@@ -430,100 +441,75 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
 
 /* ───────────────────────── DRE e FLUXO DE CAIXA (2027 a 2033) ───────────────────────── */
 
-export type Dre = {
-  receitaBruta: number
-  deducoes: number
-  receitaLiquida: number
-  custos: number
-  lucroBruto: number
-  /** Só no DR: IBS e CBS, cobrados por fora, fora da receita bruta. */
-  ibsCbs: number
-}
-export type Fluxo = {
-  clientes: number
-  fornecedores: number
-  tributos: number
-  variacao: number
-  /** Tributo pago nas compras que não vira crédito (aproximação do estorno de crédito). */
-  estornoCredito: number
-}
-export type PontoTrilha = { ano: number; dre: Dre; fluxo: Fluxo }
+/** Somas de um recorte, por nome de métrica. */
+export type Somas = Record<string, number>
+
+/**
+ * A base da DRE e do fluxo de caixa: as vendas de cada ano em cada cenário e as compras de cada
+ * ano (iguais nos três cenários de venda), com o detalhe por tributo. A montagem das linhas fica
+ * no navegador, a partir destas somas.
+ */
 export type Trilha = {
-  ar: { dre: Dre; fluxo: Fluxo }
-  cenarios: (CenarioVenda & { anos: PontoTrilha[] })[]
+  anos: number[]
+  ar: { vendas: Somas; compras: Somas }
+  compras: Somas[]
+  cenarios: (CenarioVenda & { vendas: Somas[] })[]
 }
 
-const METRICAS_TRILHA = [
-  "valor_ar_saida",
-  "valor_dr_saida",
-  "valor_sem_iva_dr_saida",
-  "debito_ar_saida",
-  "debito_dr_saida",
-  "valor_ar_entrada",
-  "valor_dr_entrada",
-  "valor_impostos_ar_entrada",
-  "valor_impostos_dr_entrada",
-  "credito_ar_entrada",
-  "credito_dr_entrada",
-  "custo_ar_entrada",
-  "custo_dr_entrada",
-] as const satisfies readonly Metrica[]
+const METRICAS_SAIDA = [
+  "itens",
+  "valor_ar",
+  "valor_dr",
+  "valor_sem_iva_dr",
+  "valor_impostos_ar",
+  "valor_impostos_dr",
+  "debito_ar",
+  "debito_dr",
+  ...METRICAS_DEBITO,
+] as Metrica[]
+const METRICAS_ENTRADA = [
+  "itens",
+  "valor_ar",
+  "valor_dr",
+  "valor_impostos_ar",
+  "valor_impostos_dr",
+  "credito_ar",
+  "credito_dr",
+  "custo_ar",
+  "custo_dr",
+  ...METRICAS_DETALHE.filter((m) => !["valor_impostos_ar", "valor_impostos_dr", "credito_ar", "credito_dr"].includes(m)),
+] as Metrica[]
 
-function totalTrilha(id: string, recorte: Recorte) {
-  return emCache(`cap-trilha:${id}:${JSON.stringify(recorte)}`, 900, async () => {
-    const { grupos } = await pricetax().calculos.consultar(id, { recorte, sentido: "ambas", metricas: [...METRICAS_TRILHA] })
+function somas(id: string, recorte: Recorte, sentido: "entrada" | "saida") {
+  const metricas = sentido === "saida" ? METRICAS_SAIDA : METRICAS_ENTRADA
+  return emCache(`cap-somas:${id}:${sentido}:${JSON.stringify(recorte)}`, 900, async () => {
+    const { grupos } = await pricetax().calculos.consultar(id, { recorte, sentido, metricas })
     const g = grupos[0] ?? {}
-    return Object.fromEntries(METRICAS_TRILHA.map((m) => [m, n(g[m])])) as Record<(typeof METRICAS_TRILHA)[number], number>
+    return Object.fromEntries(metricas.map((m) => [m, n(g[m])])) as Somas
   })
-}
-
-type TotalTrilha = Awaited<ReturnType<typeof totalTrilha>>
-
-function dreAr(t: TotalTrilha): Dre {
-  const receitaBruta = t.valor_ar_saida
-  const deducoes = t.debito_ar_saida
-  const custos = t.custo_ar_entrada
-  return { receitaBruta, deducoes, receitaLiquida: receitaBruta - deducoes, custos, lucroBruto: receitaBruta - deducoes - custos, ibsCbs: 0 }
-}
-function dreDr(t: TotalTrilha): Dre {
-  // Receita bruta sem IBS/CBS; deduções = só os tributos atuais que ainda restam no ano.
-  const receitaBruta = t.valor_sem_iva_dr_saida
-  const ibsCbs = Math.max(0, t.valor_dr_saida - t.valor_sem_iva_dr_saida)
-  const deducoes = Math.max(0, t.debito_dr_saida - ibsCbs)
-  const custos = t.custo_dr_entrada
-  return { receitaBruta, deducoes, receitaLiquida: receitaBruta - deducoes, custos, lucroBruto: receitaBruta - deducoes - custos, ibsCbs }
-}
-function fluxo(t: TotalTrilha, lado: "ar" | "dr"): Fluxo {
-  const clientes = t[`valor_${lado}_saida`]
-  const fornecedores = t[`valor_${lado}_entrada`]
-  const tributos = t[`debito_${lado}_saida`] - t[`credito_${lado}_entrada`]
-  return {
-    clientes,
-    fornecedores,
-    tributos,
-    variacao: clientes - fornecedores - tributos,
-    estornoCredito: Math.max(0, t[`valor_impostos_${lado}_entrada`] - t[`credito_${lado}_entrada`]),
-  }
 }
 
 export async function montarTrilha(calculo: CalculoDetalhe, regime: Recorte["regime"]): Promise<Trilha> {
   const id = calculo.id
-  const anos = [...calculo.anos].sort((a, b) => a - b).filter((a) => a >= ANO_ACAO)
-  const lista = anos.length ? anos : [...calculo.anos].sort((a, b) => a - b)
+  const todos = [...calculo.anos].sort((a, b) => a - b)
+  const anos = todos.filter((a) => a >= ANO_ACAO).length ? todos.filter((a) => a >= ANO_ACAO) : todos
   const cenarios = cenariosDeVenda(calculo)
-  let ar: Trilha["ar"] | null = null
+  // Compras: uma consulta por ano (o cenário de venda não muda as compras).
+  const compras: Somas[] = []
+  for (const ano of anos) compras.push(await somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "entrada"))
+  // Vendas: uma consulta por ano e cenário (até 7 × 3), em sequência e com cache.
   const resultado: Trilha["cenarios"] = []
-  // Uma consulta por ano e cenário (até 7 × 3), em sequência e com cache.
   for (const c of cenarios) {
-    const pontos: PontoTrilha[] = []
-    for (const ano of lista) {
-      const t = await totalTrilha(id, { regime, ano, cenario_vendas: c.id, cenario_compras: "base" })
-      ar ??= { dre: dreAr(t), fluxo: fluxo(t, "ar") }
-      pontos.push({ ano, dre: dreDr(t), fluxo: fluxo(t, "dr") })
-    }
-    resultado.push({ ...c, anos: pontos })
+    const vendas: Somas[] = []
+    for (const ano of anos) vendas.push(await somas(id, { regime, ano, cenario_vendas: c.id, cenario_compras: "base" }, "saida"))
+    resultado.push({ ...c, vendas })
   }
-  return { ar: ar!, cenarios: resultado }
+  return {
+    anos,
+    ar: { vendas: resultado[0]?.vendas[0] ?? {}, compras: compras[0] ?? {} },
+    compras,
+    cenarios: resultado,
+  }
 }
 
 /* ───────────────────────────── ESTORNO DE DÉBITO ───────────────────────────── */

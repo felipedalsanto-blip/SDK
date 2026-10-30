@@ -1,22 +1,19 @@
 "use client"
 import { useState } from "react"
-import type { Dre as LinhaDre, Trilha } from "@/lib/capitulos"
+import type { Trilha } from "@/lib/capitulos"
+import { acharLinha, montarDre } from "@/lib/demonstrativos"
 import { Erro } from "../comum"
-import { api, fmtBRL, useBusca } from "../util"
-import { Alternar, Bloco, COR_CENARIO, Capitulo, ColunasAno, Diferenca, Indicador, Premissa, TabelaAnos } from "./ui"
+import { api, fmtBRL, fmtPct, useBusca } from "../util"
+import { Alternar, Bloco, COR_CENARIO, Capitulo, Demonstrativo, Diferenca, Indicador, LinhasAno, Premissa } from "./ui"
 
 export function useTrilha(calculoId: string, regime: string) {
   return useBusca((s) => api<Trilha>(`/api/calculos/${calculoId}/capitulos/trilha`, { regime }, s), [calculoId, regime])
 }
 
-const LINHAS: { chave: keyof LinhaDre; nome: string; destaque?: boolean }[] = [
-  { chave: "receitaBruta", nome: "Receita bruta" },
-  { chave: "deducoes", nome: "(−) Deduções de tributos" },
-  { chave: "receitaLiquida", nome: "Receita líquida" },
-  { chave: "custos", nome: "(−) Custos e despesas de compra" },
-  { chave: "lucroBruto", nome: "Lucro bruto", destaque: true },
-  { chave: "ibsCbs", nome: "IBS e CBS (por fora, fora da receita)" },
-]
+/** Os valores de uma linha do demonstrativo em cada cenário: [AR, ...anos]. */
+export function porCenario(t: Trilha, montar: typeof montarDre, id: string) {
+  return t.cenarios.map((c) => ({ c, valores: acharLinha(montar(t, c.id), id)?.valores ?? [] }))
+}
 
 export function Dre({ calculoId, regime }: { calculoId: string; regime: string }) {
   const { dados, erro, carregando } = useTrilha(calculoId, regime)
@@ -24,14 +21,21 @@ export function Dre({ calculoId, regime }: { calculoId: string; regime: string }
   if (erro) return <Erro erro={erro} />
   if (!dados) return <div className="cartao vazio">Montando a DRE de 2027 a 2033 nos três cenários…</div>
 
-  const anos = dados.cenarios[0]?.anos.map((p) => p.ano) ?? []
+  const anos = dados.anos
   const escolhido = dados.cenarios.find((c) => c.id === cenario) ?? dados.cenarios.find((c) => c.rotulo === "Com Reajuste") ?? dados.cenarios[0]
-  const primeiro = escolhido.anos[0]
-  const ultimo = escolhido.anos[escolhido.anos.length - 1]
-  const ar = dados.ar.dre
-  // Receita bruta AR − DR = tributos atuais que saem da receita + mudança no preço líquido.
-  const saemTributos = ar.deducoes - primeiro.dre.deducoes
-  const mudaPreco = ar.receitaLiquida - primeiro.dre.receitaLiquida
+  const linhas = montarDre(dados, escolhido.id)
+  const v = (id: string) => acharLinha(linhas, id)?.valores ?? []
+  const series = (id: string) =>
+    porCenario(dados, montarDre, id).map(({ c, valores }) => ({ nome: c.rotulo, cor: COR_CENARIO[c.rotulo], valores: valores.slice(1) }))
+  const ar = (id: string) => v(id)[0] ?? null
+
+  // Receita bruta de hoje − a do primeiro ano = tributos atuais que saem + mudança no preço líquido.
+  const rb = v("rb")
+  const ded = v("ded")
+  const rl = v("rl")
+  const saemTributos = -(ded[0] ?? 0) + (ded[1] ?? 0)
+  const mudaPreco = (rl[0] ?? 0) - (rl[1] ?? 0)
+  const lb = v("lb")
 
   return (
     <div className={carregando ? "carregando" : undefined}>
@@ -45,8 +49,8 @@ export function Dre({ calculoId, regime }: { calculoId: string; regime: string }
             </div>
             <div>
               <span className="cap-didatico-n">2</span>
-              <b>Depois (DR), o IBS e a CBS ficam fora da receita bruta.</b> São cobrados por fora, como o IPI. A receita bruta cai por dois motivos: o
-              reajuste de preço de cada cenário e a saída do tributo de dentro do preço.
+              <b>Depois (DR), o IBS e a CBS ficam fora da receita bruta.</b> São cobrados por fora. A receita bruta cai por dois motivos: o reajuste
+              de preço de cada cenário e a saída do tributo de dentro do preço.
             </div>
             <div>
               <span className="cap-didatico-n">3</span>
@@ -55,65 +59,48 @@ export function Dre({ calculoId, regime }: { calculoId: string; regime: string }
             </div>
             <div>
               <span className="cap-didatico-n">4</span>
-              <b>Os tributos atuais vão saindo de cena.</b> A linha de deduções encolhe a cada ano e, em {ultimo.ano}, a DRE fica limpa de tributos.
+              <b>Os tributos atuais vão saindo de cena.</b> A linha de deduções encolhe a cada ano e, em {anos[anos.length - 1]}, a DRE fica limpa
+              de tributos.
             </div>
           </div>
         </Bloco>
 
-        <Bloco titulo={`Por que a receita bruta muda em ${primeiro.ano} · ${escolhido.rotulo}`}>
+        <Bloco
+          titulo="DRE"
+          leitura="No formato da DRE: clique numa linha com ▸ para abrir até o tributo (deduções por tributo, créditos por tributo). Valores negativos são saídas."
+        >
+          <Alternar opcoes={Object.fromEntries(dados.cenarios.map((c) => [c.id, c.rotulo]))} valor={escolhido.id} onChange={(x) => setCenario(x)} />
+          <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} />
+          <p className="cap-nota">
+            Lucro bruto em {anos[anos.length - 1]} contra hoje, no cenário {escolhido.rotulo}:{" "}
+            <Diferenca valor={(lb[lb.length - 1] ?? 0) - (lb[0] ?? 0)} subirEhBom />.
+          </p>
+        </Bloco>
+
+        <Bloco titulo={`Por que a receita bruta muda em ${anos[0]} · ${escolhido.rotulo}`}>
           <div className="cap-kpis">
-            <Indicador rotulo="Receita bruta hoje" valor={fmtBRL(ar.receitaBruta)} contexto="com os tributos atuais dentro do preço" />
-            <Indicador rotulo={`Receita bruta ${primeiro.ano}`} valor={fmtBRL(primeiro.dre.receitaBruta)} contexto="sem IBS e CBS" />
-            <Indicador
-              rotulo="Tributos atuais que saem da receita"
-              valor={fmtBRL(saemTributos)}
-              contexto="deduções de hoje menos as que restam"
-            />
+            <Indicador rotulo="Receita bruta hoje" valor={fmtBRL(rb[0] ?? 0)} contexto="com os tributos atuais dentro do preço" />
+            <Indicador rotulo={`Receita bruta ${anos[0]}`} valor={fmtBRL(rb[1] ?? 0)} contexto="sem IBS e CBS" />
+            <Indicador rotulo="Tributos atuais que saem da receita" valor={fmtBRL(saemTributos)} contexto="deduções de hoje menos as que restam" />
             <Indicador rotulo="Mudança no preço líquido" valor={fmtBRL(mudaPreco)} contexto="receita líquida de hoje menos a nova" />
           </div>
-          <p className="cap-nota">Receita bruta de hoje − receita bruta de {primeiro.ano} = tributos que saem + mudança no preço líquido.</p>
         </Bloco>
 
         <Bloco
-          titulo="Lucro bruto ano a ano, nos três cenários"
-          leitura="A coluna cinza é o resultado de hoje. Cada ano mostra os três caminhos de preço lado a lado: a distância entre eles é o que a decisão de preço vale."
+          titulo="Lucro bruto no tempo"
+          leitura="A linha tracejada é o resultado de hoje. Cada linha é um caminho de preço: a distância entre elas é o que a decisão de preço vale, ano a ano."
         >
-          <ColunasAno
-            anos={anos}
-            ar={ar.lucroBruto}
-            series={dados.cenarios.map((c) => ({ nome: c.rotulo, cor: COR_CENARIO[c.rotulo], valores: c.anos.map((p) => p.dre.lucroBruto) }))}
-          />
+          <LinhasAno anos={anos} ar={ar("lb")} series={series("lb")} />
         </Bloco>
 
-        <Bloco titulo="Receita bruta ano a ano" leitura="A queda de 2027 em diante não é venda a menos: é o IBS e a CBS saindo de dentro do preço.">
-          <ColunasAno
-            anos={anos}
-            ar={ar.receitaBruta}
-            series={dados.cenarios.map((c) => ({ nome: c.rotulo, cor: COR_CENARIO[c.rotulo], valores: c.anos.map((p) => p.dre.receitaBruta) }))}
-          />
-        </Bloco>
-
-        <Bloco titulo="DRE completa por cenário">
-          <Alternar
-            opcoes={Object.fromEntries(dados.cenarios.map((c) => [c.id, c.rotulo]))}
-            valor={escolhido.id}
-            onChange={(v) => setCenario(v)}
-          />
-          <div style={{ marginTop: 12 }}>
-            <TabelaAnos
-              anos={anos}
-              linhas={LINHAS.map((l) => ({
-                nome: l.nome,
-                ar: l.chave === "ibsCbs" ? null : ar[l.chave],
-                valores: escolhido.anos.map((p) => p.dre[l.chave]),
-                destaque: l.destaque,
-              }))}
-            />
-          </div>
-          <p className="cap-nota">
-            Lucro bruto em {ultimo.ano} contra hoje: <Diferenca valor={ultimo.dre.lucroBruto - ar.lucroBruto} subirEhBom />.
-          </p>
-        </Bloco>
+        <div className="grade-2">
+          <Bloco titulo="Margem bruta" leitura="Lucro bruto sobre a receita líquida.">
+            <LinhasAno anos={anos} ar={ar("mb")} series={series("mb")} formatar={(x) => fmtPct(x)} />
+          </Bloco>
+          <Bloco titulo="Receita bruta" leitura="A queda não é venda a menos: é o IBS e a CBS saindo de dentro do preço.">
+            <LinhasAno anos={anos} ar={ar("rb")} series={series("rb")} />
+          </Bloco>
+        </div>
 
         <Premissa>
           A DRE vai até o lucro bruto: a API de cálculos não traz despesas operacionais, IR e CSLL. Custos = compras do período (custos e despesas

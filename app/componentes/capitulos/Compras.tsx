@@ -3,6 +3,7 @@ import { useState } from "react"
 import type { Compras as Dados } from "@/lib/capitulos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
+import { Explorador } from "./Explorador"
 import { Alternar, Bloco, Capitulo, Diferenca, Indicador, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
 
 type Sentido = "aumento" | "reducao"
@@ -142,6 +143,13 @@ export function Compras({ calculoId, regime }: { calculoId: string; regime: stri
               )}
             </div>
           </div>
+        </Bloco>
+
+        <Bloco
+          titulo="Monte a sua visão"
+          leitura="Nasce por item e fornecedor. Troque os agrupadores (NCM, regime, CFOP, competência…), abra impostos e créditos por tributo e baixe em CSV."
+        >
+          <Explorador calculoId={calculoId} regime={regime} sentido="entrada" />
         </Bloco>
 
         <Bloco titulo="Plano de negociação com fornecedores" leitura="Do ponto de vista da empresa compradora. Comece pelos fornecedores do Pareto.">

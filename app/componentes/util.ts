@@ -95,7 +95,7 @@ const inteiro = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 })
 const pct = new Intl.NumberFormat("pt-BR", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 2 })
 
 // `null` é "sem dado", não zero: aparece como travessão.
-export const fmtBRL = (v: Valor) => (num(v) === null ? "—" : brl.format(num(v)!))
+export const fmtBRL = (v: Valor) => (num(v) === null ? "—" : brl.format(Math.abs(num(v)!) < 0.005 ? 0 : num(v)!))
 export const fmtBRLCurto = (v: Valor) => (num(v) === null ? "—" : brlCompacto.format(num(v)!))
 export const fmtInt = (v: Valor) => (num(v) === null ? "—" : inteiro.format(num(v)!))
 /** Alíquotas e cargas vêm em fração (0.27 = 27%). */

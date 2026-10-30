@@ -1,6 +1,8 @@
 "use client"
-import { useState } from "react"
-import type { Pareto as DadosPareto, Parceiro, Item } from "@/lib/capitulos"
+import { createContext, Fragment, useContext, useEffect, useState } from "react"
+import type { Item, Pareto as DadosPareto, Parceiro } from "@/lib/capitulos"
+import type { Linha } from "@/lib/demonstrativos"
+import { TRIBUTOS } from "@/lib/tributos"
 import { fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, fmtPct, useLargura, variacao } from "../util"
 
 /** Cores fixas: AR (hoje) em cinza; os três cenários de venda em preto, amarelo e cinza médio. */
@@ -11,18 +13,51 @@ export const COR_CENARIO: Record<string, string> = {
   "Preço Alvo": "var(--pt-cinza-medio)",
 }
 
-export function Capitulo({ numero, titulo, sub, children }: { numero: string; titulo: string; sub: string; children: React.ReactNode }) {
+/* ───────── Expandir e recolher: comando do capítulo que todas as tabelas obedecem ───────── */
+
+type Comando = { nivel: 0 | 2; seq: number }
+const ExpandirCtx = createContext<{ comando: Comando; enviar: (nivel: 0 | 2) => void }>({
+  comando: { nivel: 0, seq: 0 },
+  enviar: () => {},
+})
+
+/** Recebe o "Expandir tudo"/"Recolher tudo" do capítulo e aplica no estado local. */
+function useComando(aplicar: (nivel: 0 | 2) => void) {
+  const { comando } = useContext(ExpandirCtx)
+  useEffect(() => {
+    if (comando.seq > 0) aplicar(comando.nivel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comando.seq])
+}
+
+export function BotoesExpandir({ onExpandir, onRecolher }: { onExpandir: () => void; onRecolher: () => void }) {
   return (
-    <section className="cap">
-      <header className="cap-cabeca">
-        <span className="cap-numero">{numero}</span>
-        <div>
-          <h2>{titulo}</h2>
-          <p>{sub}</p>
-        </div>
-      </header>
-      {children}
-    </section>
+    <span className="cap-expandir">
+      <button onClick={onExpandir}>⊞ Expandir tudo</button>
+      <button onClick={onRecolher}>⊟ Recolher tudo</button>
+    </span>
+  )
+}
+
+export function Capitulo({ numero, titulo, sub, children }: { numero: string; titulo: string; sub: string; children: React.ReactNode }) {
+  const [comando, setComando] = useState<Comando>({ nivel: 0, seq: 0 })
+  const enviar = (nivel: 0 | 2) => setComando((c) => ({ nivel, seq: c.seq + 1 }))
+  return (
+    <ExpandirCtx.Provider value={{ comando, enviar }}>
+      <section className="cap">
+        <header className="cap-cabeca">
+          <span className="cap-numero">{numero}</span>
+          <div style={{ flex: 1 }}>
+            <h2>{titulo}</h2>
+            <p>{sub}</p>
+          </div>
+          <span className="cap-cabeca-acoes">
+            <BotoesExpandir onExpandir={() => enviar(2)} onRecolher={() => enviar(0)} />
+          </span>
+        </header>
+        {children}
+      </section>
+    </ExpandirCtx.Provider>
   )
 }
 
@@ -46,7 +81,7 @@ export function Indicador({ rotulo, valor, contexto }: { rotulo: string; valor: 
   )
 }
 
-/** Variação com seta: ▲ sobe, ▼ cai. A cor fica no texto de apoio; a seta carrega o sentido. */
+/** Variação com seta: ▲ sobe, ▼ cai. */
 export function Seta({ antes, depois }: { antes: number; depois: number }) {
   const v = variacao(antes, depois)
   if (v === null || Math.abs(depois - antes) < 0.005) return <span className="cap-seta">sem mudança</span>
@@ -64,99 +99,217 @@ export function Diferenca({ valor, subirEhBom = false }: { valor: number; subirE
   return <span className={ruim ? "cap-sobe" : "cap-cai"}>{`${valor > 0 ? "+" : "−"}${fmtBRL(Math.abs(valor))}`}</span>
 }
 
-/** Lista de parceiros (fornecedores ou clientes) com valor e custo antes e depois. */
-export function TabelaParceiros({ lista, mostrarCusto = true, vazio }: { lista: Parceiro[]; mostrarCusto?: boolean; vazio: string }) {
-  if (lista.length === 0) return <p className="cap-vazio">{vazio}</p>
+/* ───────── Colunas que expandem: impostos e créditos, totais e por tributo ───────── */
+
+type Nivel = 0 | 1 | 2
+type GrupoColuna = "impostos" | "creditos"
+const NOME_GRUPO: Record<GrupoColuna, { nome: string; total: string; prefixo: string }> = {
+  impostos: { nome: "Impostos", total: "valor_impostos", prefixo: "valor" },
+  creditos: { nome: "Créditos", total: "credito", prefixo: "credito" },
+}
+
+type ColunaExtra = { id: string; nome: string; valor: (e: Record<string, number>) => number; grupo: GrupoColuna; dif?: boolean }
+
+/** As colunas extras visíveis, conforme o nível de cada grupo e os tributos que aparecem nas linhas. */
+function colunasExtras(niveis: Record<GrupoColuna, Nivel>, grupos: GrupoColuna[], linhas: { extras: Record<string, number> }[]): ColunaExtra[] {
+  const cols: ColunaExtra[] = []
+  for (const g of grupos) {
+    const { nome, total, prefixo } = NOME_GRUPO[g]
+    if (niveis[g] >= 1) {
+      cols.push({ id: `${g}-ar`, nome: `${nome} AR`, valor: (e) => e[`${total}_ar`] ?? 0, grupo: g })
+      cols.push({ id: `${g}-dr`, nome: `${nome} DR`, valor: (e) => e[`${total}_dr`] ?? 0, grupo: g })
+      cols.push({ id: `${g}-dif`, nome: `Dif. ${nome.toLowerCase()}`, valor: (e) => (e[`${total}_dr`] ?? 0) - (e[`${total}_ar`] ?? 0), grupo: g, dif: true })
+    }
+    if (niveis[g] >= 2) {
+      for (const t of TRIBUTOS) {
+        for (const l of ["ar", "dr"] as const) {
+          const chave = `${prefixo}_${t.id}_${l}`
+          if (linhas.some((x) => Math.abs(x.extras[chave] ?? 0) > 0.005)) {
+            cols.push({ id: `${g}-${t.id}-${l}`, nome: `${g === "creditos" ? "Créd. " : ""}${t.nome} ${l.toUpperCase()}`, valor: (e) => e[chave] ?? 0, grupo: g })
+          }
+        }
+      }
+    }
+  }
+  return cols
+}
+
+function SeletorGrupos({ grupos, niveis, setNiveis }: { grupos: GrupoColuna[]; niveis: Record<GrupoColuna, Nivel>; setNiveis: (n: Record<GrupoColuna, Nivel>) => void }) {
   return (
-    <div className="tabela-rolagem">
-      <table className="cap-tabela">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Nome</th>
-            <th className="num">Valor AR</th>
-            <th className="num">Valor DR</th>
-            <th className="num">Diferença</th>
-            {mostrarCusto && <th className="num">Custo AR</th>}
-            {mostrarCusto && <th className="num">Custo DR</th>}
-            {mostrarCusto && <th className="num">Dif. custo</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {lista.map((p, i) => (
-            <tr key={`${p.cnpj}-${i}`}>
-              <td className="cap-pos">{i + 1}</td>
-              <td className="texto" title={p.nome ?? undefined}>
-                <b>{p.nome ?? "Sem identificação"}</b>
-                <span className="cap-sub">{p.cnpj ? fmtCnpj(p.cnpj) : "sem CNPJ"}</span>
-              </td>
-              <td className="num">{fmtBRL(p.valorAr)}</td>
-              <td className="num">{fmtBRL(p.valorDr)}</td>
-              <td className="num">
-                <Diferenca valor={p.valorDr - p.valorAr} /> <Seta antes={p.valorAr} depois={p.valorDr} />
-              </td>
-              {mostrarCusto && <td className="num">{fmtBRL(p.custoAr)}</td>}
-              {mostrarCusto && <td className="num">{fmtBRL(p.custoDr)}</td>}
-              {mostrarCusto && (
-                <td className="num">
-                  <Diferenca valor={p.custoDr - p.custoAr} />
-                </td>
-              )}
-            </tr>
+    <div className="cap-grupos">
+      {grupos.map((g) => (
+        <span key={g} className="cap-grupo">
+          <b>{NOME_GRUPO[g].nome}</b>
+          {(["Recolher", "Totais", "Por tributo"] as const).map((rotulo, i) => (
+            <button key={rotulo} aria-pressed={niveis[g] === i} onClick={() => setNiveis({ ...niveis, [g]: i as Nivel })}>
+              {rotulo}
+            </button>
           ))}
-        </tbody>
-      </table>
+        </span>
+      ))}
+      <BotoesExpandir
+        onExpandir={() => setNiveis(Object.fromEntries(grupos.map((g) => [g, 2])) as Record<GrupoColuna, Nivel>)}
+        onRecolher={() => setNiveis(Object.fromEntries(grupos.map((g) => [g, 0])) as Record<GrupoColuna, Nivel>)}
+      />
     </div>
   )
 }
 
-/** Itens ligados ao parceiro (fornecedor nas compras, cliente nas vendas). */
-export function TabelaItens({ lista, parceiro, mostrarCusto = true, vazio }: { lista: Item[]; parceiro: string; mostrarCusto?: boolean; vazio: string }) {
-  if (lista.length === 0) return <p className="cap-vazio">{vazio}</p>
+function useNiveis(grupos: GrupoColuna[]) {
+  const [niveis, setNiveis] = useState<Record<GrupoColuna, Nivel>>({ impostos: 0, creditos: 0 })
+  useComando((n) => setNiveis(Object.fromEntries(grupos.map((g) => [g, n])) as Record<GrupoColuna, Nivel>))
+  return [niveis, setNiveis] as const
+}
+
+function CelulasExtras({ cols, extras }: { cols: ColunaExtra[]; extras: Record<string, number> }) {
   return (
-    <div className="tabela-rolagem">
-      <table className="cap-tabela">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Item</th>
-            <th>{parceiro}</th>
-            <th className="num">Valor AR</th>
-            <th className="num">Valor DR</th>
-            <th className="num">Diferença</th>
-            {mostrarCusto && <th className="num">Dif. custo</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {lista.map((x, i) => (
-            <tr key={i}>
-              <td className="cap-pos">{i + 1}</td>
-              <td className="texto" title={x.descricao ?? undefined}>
-                <b>{x.descricao ?? "Sem descrição"}</b>
-                <span className="cap-sub">NCM {x.ncm ?? "n/d"}</span>
-              </td>
-              <td className="texto" title={x.nome ?? undefined}>
-                {x.nome ?? (x.cnpj ? fmtCnpj(x.cnpj) : "Sem identificação")}
-              </td>
-              <td className="num">{fmtBRL(x.valorAr)}</td>
-              <td className="num">{fmtBRL(x.valorDr)}</td>
-              <td className="num">
-                <Diferenca valor={x.valorDr - x.valorAr} /> <Seta antes={x.valorAr} depois={x.valorDr} />
-              </td>
-              {mostrarCusto && (
-                <td className="num">
-                  <Diferenca valor={x.custoDr - x.custoAr} />
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {cols.map((c) => (
+        <td key={c.id} className={`num cap-col-${c.grupo}`}>
+          {c.dif ? <Diferenca valor={c.valor(extras)} subirEhBom={c.grupo === "creditos"} /> : fmtBRL(c.valor(extras))}
+        </td>
+      ))}
+    </>
   )
 }
 
-/** Pareto em barras: cada grupo, sua parte do total e o acumulado; a faixa amarela marca os 80%. */
+/** Lista de parceiros (fornecedores ou clientes) com valor e custo antes e depois, e colunas que expandem. */
+export function TabelaParceiros({
+  lista,
+  mostrarCusto = true,
+  grupos = ["impostos", "creditos"],
+  vazio,
+}: {
+  lista: Parceiro[]
+  mostrarCusto?: boolean
+  grupos?: GrupoColuna[]
+  vazio: string
+}) {
+  const [niveis, setNiveis] = useNiveis(grupos)
+  if (lista.length === 0) return <p className="cap-vazio">{vazio}</p>
+  const extras = colunasExtras(niveis, grupos, lista)
+  return (
+    <>
+      <SeletorGrupos grupos={grupos} niveis={niveis} setNiveis={setNiveis} />
+      <div className="tabela-rolagem">
+        <table className="cap-tabela">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nome</th>
+              <th className="num">Valor AR</th>
+              <th className="num">Valor DR</th>
+              <th className="num">Diferença</th>
+              {mostrarCusto && <th className="num">Custo AR</th>}
+              {mostrarCusto && <th className="num">Custo DR</th>}
+              {mostrarCusto && <th className="num">Dif. custo</th>}
+              {extras.map((c) => (
+                <th key={c.id} className={`num cap-col-${c.grupo}`}>
+                  {c.nome}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((p, i) => (
+              <tr key={`${p.cnpj}-${i}`}>
+                <td className="cap-pos">{i + 1}</td>
+                <td className="texto" title={p.nome ?? undefined}>
+                  <b>{p.nome ?? "Sem identificação"}</b>
+                  <span className="cap-sub">{p.cnpj ? fmtCnpj(p.cnpj) : "sem CNPJ"}</span>
+                </td>
+                <td className="num">{fmtBRL(p.valorAr)}</td>
+                <td className="num">{fmtBRL(p.valorDr)}</td>
+                <td className="num">
+                  <Diferenca valor={p.valorDr - p.valorAr} /> <Seta antes={p.valorAr} depois={p.valorDr} />
+                </td>
+                {mostrarCusto && <td className="num">{fmtBRL(p.custoAr)}</td>}
+                {mostrarCusto && <td className="num">{fmtBRL(p.custoDr)}</td>}
+                {mostrarCusto && (
+                  <td className="num">
+                    <Diferenca valor={p.custoDr - p.custoAr} />
+                  </td>
+                )}
+                <CelulasExtras cols={extras} extras={p.extras} />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+/** Itens ligados ao parceiro (fornecedor nas compras, cliente nas vendas), com colunas que expandem. */
+export function TabelaItens({
+  lista,
+  parceiro,
+  mostrarCusto = true,
+  grupos = ["impostos", "creditos"],
+  vazio,
+}: {
+  lista: Item[]
+  parceiro: string
+  mostrarCusto?: boolean
+  grupos?: GrupoColuna[]
+  vazio: string
+}) {
+  const [niveis, setNiveis] = useNiveis(grupos)
+  if (lista.length === 0) return <p className="cap-vazio">{vazio}</p>
+  const extras = colunasExtras(niveis, grupos, lista)
+  return (
+    <>
+      <SeletorGrupos grupos={grupos} niveis={niveis} setNiveis={setNiveis} />
+      <div className="tabela-rolagem">
+        <table className="cap-tabela">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Item</th>
+              <th>{parceiro}</th>
+              <th className="num">Valor AR</th>
+              <th className="num">Valor DR</th>
+              <th className="num">Diferença</th>
+              {mostrarCusto && <th className="num">Dif. custo</th>}
+              {extras.map((c) => (
+                <th key={c.id} className={`num cap-col-${c.grupo}`}>
+                  {c.nome}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((x, i) => (
+              <tr key={i}>
+                <td className="cap-pos">{i + 1}</td>
+                <td className="texto" title={x.descricao ?? undefined}>
+                  <b>{x.descricao ?? "Sem descrição"}</b>
+                  <span className="cap-sub">NCM {x.ncm ?? "n/d"}</span>
+                </td>
+                <td className="texto" title={x.nome ?? undefined}>
+                  {x.nome ?? (x.cnpj ? fmtCnpj(x.cnpj) : "Sem identificação")}
+                </td>
+                <td className="num">{fmtBRL(x.valorAr)}</td>
+                <td className="num">{fmtBRL(x.valorDr)}</td>
+                <td className="num">
+                  <Diferenca valor={x.valorDr - x.valorAr} /> <Seta antes={x.valorAr} depois={x.valorDr} />
+                </td>
+                {mostrarCusto && (
+                  <td className="num">
+                    <Diferenca valor={x.custoDr - x.custoAr} />
+                  </td>
+                )}
+                <CelulasExtras cols={extras} extras={x.extras} />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+/** Pareto em barras: cada grupo, sua parte do total e o acumulado; amarelo até os 80%. */
 export function Pareto({ dados, medida }: { dados: DadosPareto; medida: string }) {
   if (dados.universo === 0) return <p className="cap-vazio">Nenhum caso nesta medida.</p>
   const maior = dados.fatias[0]?.valor ?? 1
@@ -181,7 +334,7 @@ export function Pareto({ dados, medida }: { dados: DadosPareto; medida: string }
   )
 }
 
-/** Abas internas pequenas para alternar entre visões de um bloco. */
+/** Alternância pequena entre visões de um bloco. */
 export function Alternar<T extends string>({ opcoes, valor, onChange }: { opcoes: Record<T, string>; valor: T; onChange: (v: T) => void }) {
   return (
     <div className="cap-alternar" role="group">
@@ -197,32 +350,52 @@ export function Alternar<T extends string>({ opcoes, valor, onChange }: { opcoes
 export type Serie = { nome: string; cor: string; valores: (number | null)[] }
 
 /**
- * Colunas agrupadas por ano, com a coluna AR (hoje) à esquerda como referência. Aceita valores
- * negativos (linha do zero marcada). Passe o mouse para ver o valor; a tabela fica embaixo.
+ * Linhas ano a ano, uma por cenário, com o valor de hoje (AR) como linha tracejada de referência.
+ * Passe o mouse: uma régua vertical mostra os valores de todos os cenários naquele ano.
  */
-export function ColunasAno({ anos, ar, series, rotuloAr = "Hoje (AR)" }: { anos: number[]; ar: number | null; series: Serie[]; rotuloAr?: string }) {
+export function LinhasAno({
+  anos,
+  ar,
+  series,
+  formatar = fmtBRL,
+  rotuloAr = "Hoje (AR)",
+}: {
+  anos: number[]
+  ar: number | null
+  series: Serie[]
+  formatar?: (v: number) => string
+  rotuloAr?: string
+}) {
   const [ref, largura] = useLargura<HTMLDivElement>()
-  const [foco, setFoco] = useState<string | null>(null)
-  const todos = [ar ?? 0, ...series.flatMap((s) => s.valores.map((v) => v ?? 0))]
-  const max = Math.max(0, ...todos)
-  const min = Math.min(0, ...todos)
-  const altura = 240
-  const topo = 16
+  const [foco, setFoco] = useState<number | null>(null)
+  const valores = [...(ar !== null ? [ar] : []), ...series.flatMap((s) => s.valores.filter((v): v is number => v !== null))]
+  if (valores.length === 0) return <p className="cap-vazio">Sem dados.</p>
+  let max = Math.max(...valores)
+  let min = Math.min(...valores)
+  const folga = (max - min || Math.abs(max) || 1) * 0.12
+  max += folga
+  min -= folga
+  const altura = 260
+  const topo = 14
   const base = 26
-  const esq = 70
+  const esq = 78
+  const dir = 16
   const w = Math.max(largura, 320)
-  const grupos = anos.length + (ar !== null ? 1 : 0)
-  const banda = (w - esq - 8) / grupos
+  const iw = w - esq - dir
   const ih = altura - topo - base
+  const x = (i: number) => esq + (anos.length > 1 ? (i / (anos.length - 1)) * iw : iw / 2)
   const y = (v: number) => topo + ((max - v) / (max - min || 1)) * ih
-  const barra = Math.min(22, (banda * 0.8) / Math.max(1, series.length))
-  const ticks = [min, 0, max].filter((v, i, a) => a.indexOf(v) === i)
+  const ticks = [min + folga, (min + max) / 2, max - folga]
+  const indice = (clientX: number, rect: DOMRect) => {
+    const px = clientX - rect.left - esq
+    return Math.min(anos.length - 1, Math.max(0, Math.round(anos.length > 1 ? (px / iw) * (anos.length - 1) : 0)))
+  }
   return (
     <div className="cap-grafico" ref={ref}>
       <div className="cap-legenda">
         {ar !== null && (
           <span>
-            <i style={{ background: COR_AR }} /> {rotuloAr}
+            <i className="tracejado" style={{ borderColor: COR_AR }} /> {rotuloAr}
           </span>
         )}
         {series.map((s) => (
@@ -231,90 +404,121 @@ export function ColunasAno({ anos, ar, series, rotuloAr = "Hoje (AR)" }: { anos:
           </span>
         ))}
       </div>
-      <svg height={altura} width="100%" role="img" aria-label="Gráfico por ano" onMouseLeave={() => setFoco(null)}>
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={esq} x2={w - 8} y1={y(t)} y2={y(t)} stroke={t === 0 ? "var(--pt-eixo)" : "var(--grid)"} />
+      <svg
+        height={altura}
+        width="100%"
+        role="img"
+        aria-label="Evolução ano a ano"
+        onMouseMove={(e) => setFoco(indice(e.clientX, e.currentTarget.getBoundingClientRect()))}
+        onMouseLeave={() => setFoco(null)}
+      >
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={esq} x2={w - dir} y1={y(t)} y2={y(t)} stroke="var(--grid)" />
             <text x={esq - 8} y={y(t)} dy="0.32em" textAnchor="end" className="cap-eixo">
-              {fmtBRLCurto(t)}
+              {formatar === fmtBRL ? fmtBRLCurto(t) : formatar(t)}
             </text>
           </g>
         ))}
-        {ar !== null && (
-          <g onMouseEnter={() => setFoco(`${rotuloAr}: ${fmtBRL(ar)}`)}>
-            <rect x={esq + banda / 2 - barra / 2} y={Math.min(y(ar), y(0))} width={barra} height={Math.max(1, Math.abs(y(ar) - y(0)))} rx={3} fill={COR_AR} />
-            <text x={esq + banda / 2} y={altura - 8} textAnchor="middle" className="cap-eixo forte">
-              Hoje
-            </text>
-          </g>
-        )}
-        {anos.map((ano, i) => {
-          const x0 = esq + banda * (i + (ar !== null ? 1 : 0))
-          const larguraGrupo = barra * series.length + 2 * (series.length - 1)
-          return (
-            <g key={ano}>
-              {series.map((s, k) => {
-                const v = s.valores[i]
-                if (v === null || v === undefined) return null
-                return (
-                  <rect
-                    key={s.nome}
-                    x={x0 + banda / 2 - larguraGrupo / 2 + k * (barra + 2)}
-                    y={Math.min(y(v), y(0))}
-                    width={barra}
-                    height={Math.max(1, Math.abs(y(v) - y(0)))}
-                    rx={3}
-                    fill={s.cor}
-                    stroke={s.cor === "var(--pt-amarelo)" ? "var(--pt-borda-amarelo)" : "none"}
-                    onMouseEnter={() => setFoco(`${s.nome}, ${ano}: ${fmtBRL(v)}`)}
-                  />
-                )
-              })}
-              <text x={x0 + banda / 2} y={altura - 8} textAnchor="middle" className="cap-eixo">
-                {ano}
-              </text>
-            </g>
-          )
-        })}
+        {min < 0 && max > 0 && <line x1={esq} x2={w - dir} y1={y(0)} y2={y(0)} stroke="var(--pt-eixo)" />}
+        {anos.map((a, i) => (
+          <text key={a} x={x(i)} y={altura - 8} textAnchor="middle" className="cap-eixo">
+            {a}
+          </text>
+        ))}
+        {ar !== null && <line x1={esq} x2={w - dir} y1={y(ar)} y2={y(ar)} stroke={COR_AR} strokeWidth={2} strokeDasharray="6 5" />}
+        {foco !== null && <line x1={x(foco)} x2={x(foco)} y1={topo} y2={topo + ih} stroke="var(--text-muted)" strokeDasharray="3 3" />}
+        {series.map((s) => (
+          <Fragment key={s.nome}>
+            <path
+              d={s.valores.map((v, i) => (v === null ? "" : `${i === 0 || s.valores[i - 1] === null ? "M" : "L"}${x(i)},${y(v)}`)).join("")}
+              fill="none"
+              stroke={s.cor}
+              strokeWidth={2.5}
+              strokeLinejoin="round"
+            />
+            {s.valores.map((v, i) =>
+              v === null ? null : (
+                <circle key={i} cx={x(i)} cy={y(v)} r={foco === i ? 5.5 : 3.5} fill={s.cor} stroke="var(--surface-1)" strokeWidth={2} />
+              ),
+            )}
+          </Fragment>
+        ))}
       </svg>
       <p className="cap-foco" aria-live="polite">
-        {foco ?? "Passe o mouse nas colunas para ver o valor."}
+        {foco === null
+          ? "Passe o mouse no gráfico para ver os valores de cada ano."
+          : `${anos[foco]}: ${series.map((s) => `${s.nome} ${s.valores[foco] === null ? "n/d" : formatar(s.valores[foco]!)}`).join(" · ")}${
+              ar !== null ? ` · ${rotuloAr} ${formatar(ar)}` : ""
+            }`}
       </p>
     </div>
   )
 }
 
-/** Tabela ano a ano das mesmas séries do gráfico (a trilha de auditoria dos números). */
-export function TabelaAnos({ anos, linhas }: { anos: number[]; linhas: { nome: string; ar: number | null; valores: (number | null)[]; destaque?: boolean }[] }) {
+/**
+ * Demonstrativo (DRE ou fluxo de caixa): linhas com valores por coluna, que abrem até o tributo.
+ * Nasce com as linhas principais; "Expandir tudo" do capítulo ou da tabela abre todos os níveis.
+ */
+export function Demonstrativo({ colunas, linhas }: { colunas: string[]; linhas: Linha[] }) {
+  const [abertas, setAbertas] = useState<Set<string>>(new Set())
+  const todas = (ls: Linha[]): string[] => ls.flatMap((l) => (l.filhos?.length ? [l.id, ...todas(l.filhos)] : []))
+  const expandir = () => setAbertas(new Set(todas(linhas)))
+  const recolher = () => setAbertas(new Set())
+  useComando((n) => (n === 2 ? expandir() : recolher()))
+  const alternar = (id: string) =>
+    setAbertas((a) => {
+      const b = new Set(a)
+      if (b.has(id)) b.delete(id)
+      else b.add(id)
+      return b
+    })
+  const formatar = (l: Linha, v: number | null) => (v === null ? "" : l.tipo === "percentual" ? fmtPct(v) : fmtBRL(v))
+  const render = (ls: Linha[], nivel: number): React.ReactNode =>
+    ls.map((l) => (
+      <Fragment key={l.id}>
+        <tr className={`cap-dem-${l.tipo ?? "normal"} cap-dem-nivel-${nivel}`}>
+          <td style={{ paddingLeft: 12 + nivel * 20 }}>
+            {l.filhos?.length ? (
+              <button className="cap-dem-abrir" aria-expanded={abertas.has(l.id)} onClick={() => alternar(l.id)}>
+                <span aria-hidden="true">{abertas.has(l.id) ? "▾" : "▸"}</span> {l.nome}
+              </button>
+            ) : (
+              <span className="cap-dem-nome">{l.nome}</span>
+            )}
+          </td>
+          {l.valores.map((v, i) => (
+            <td key={i} className={`num${(v ?? 0) < 0 ? " negativo" : ""}`}>
+              {formatar(l, v)}
+            </td>
+          ))}
+        </tr>
+        {l.filhos && abertas.has(l.id) && render(l.filhos, nivel + 1)}
+      </Fragment>
+    ))
   return (
-    <div className="tabela-rolagem">
-      <table className="cap-tabela">
-        <thead>
-          <tr>
-            <th />
-            <th className="num cap-th-ar">AR</th>
-            {anos.map((a) => (
-              <th key={a} className="num">
-                {a}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {linhas.map((l) => (
-            <tr key={l.nome} className={l.destaque ? "cap-linha-destaque" : undefined}>
-              <td>{l.nome}</td>
-              <td className="num">{l.ar === null ? "" : fmtBRL(l.ar)}</td>
-              {l.valores.map((v, i) => (
-                <td key={i} className="num">
-                  {v === null ? "" : fmtBRL(v)}
-                </td>
+    <>
+      {todas(linhas).length > 0 && (
+        <div className="cap-grupos">
+          <BotoesExpandir onExpandir={expandir} onRecolher={recolher} />
+        </div>
+      )}
+      <div className="tabela-rolagem">
+        <table className="cap-tabela cap-demonstrativo">
+          <thead>
+            <tr>
+              <th />
+              {colunas.map((c, i) => (
+                <th key={c} className={`num${i === 0 ? " cap-th-ar" : ""}`}>
+                  {c}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>{render(linhas, 0)}</tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
