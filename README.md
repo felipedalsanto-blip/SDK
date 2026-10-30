@@ -1,5 +1,15 @@
 # Painel de cálculos PriceTax
 
+**Diagnóstico da Reforma Tributária**, em quatro capítulos, direto do SDK:
+
+- **Compras 2027:** fornecedores e compras por regime; top 10 fornecedores e itens (com o fornecedor) que aumentam e que reduzem o preço; top 10 do Simples Nacional por custo; Pareto 80/20 por fornecedor, NCM e grupo; plano de negociação.
+- **Vendas 2027:** os cenários Sem Ajuste, Com Reajuste e Preço Alvo; clientes e vendas por regime, com o custo estimado do cliente; top 10 a 50 clientes e itens (com o cliente) e clientes do Simples; desvios de carga no mesmo NCM por destino (CFOP) e regime do cliente; Pareto; plano comercial.
+- **DRE 2027 a 2033:** até o lucro bruto, nos três cenários, explicando a saída do IBS e da CBS da receita bruta e dos custos.
+- **Fluxo de caixa 2027 a 2033:** fornecedores contra hoje; clientes, tributo recolhido e variação de caixa nos três cenários; estorno de débito (tributo destacado menos devido) e estorno de crédito (aproximado) perdendo força até 2033.
+
+Fora do alcance da API: despesas operacionais, IR e CSLL (a DRE vai até o lucro bruto) e a UF de destino (o destino é lido pelo CFOP).
+
+
 Interface web (Next.js) para visualizar os cálculos da PriceTax antes e depois da reforma
 tributária, usando o [`@pricetax/sdk`](https://developers-rho-seven.vercel.app/calculos/sdk/).
 

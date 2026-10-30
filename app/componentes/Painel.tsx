@@ -13,6 +13,10 @@ import { GraficoSerie, type PontoSerie } from "./GraficoSerie"
 import { Ranking } from "./Ranking"
 import { TabelaLinhas } from "./TabelaLinhas"
 import { VisaoClassificacao } from "./VisaoClassificacao"
+import { Compras } from "./capitulos/Compras"
+import { Dre } from "./capitulos/Dre"
+import { Fluxo } from "./capitulos/Fluxo"
+import { Vendas } from "./capitulos/Vendas"
 import { Erro, rotuloValor } from "./comum"
 
 type Total = Record<string, number | string | boolean | null>
@@ -43,8 +47,9 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
     <>
       <header className="topo">
         <div className="marca">
-          <strong>Painel de cálculos</strong>
-          <span>PriceTax · antes × depois da reforma</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-pricetax.png" alt="PriceTax" className="logo" />
+          <span>Diagnóstico da Reforma Tributária</span>
         </div>
         {calculoId && lista.dados && (
           <div className="campo" style={{ minWidth: 0 }}>
@@ -127,15 +132,16 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
   const [cenarioCompras, setCenarioCompras] = useState(cenarioInicial)
   const [sentido, setSentido] = useState<Sentido>("ambas")
   const [filtro, setFiltro] = useState<Selecao["filtro"]>(null)
-  const [aba, setAba] = useState<Aba>("geral")
+  const [aba, setAba] = useState<Aba>("compras")
 
   // A aba fica na URL (?visao=classificacao) para dar para compartilhar o link.
   useEffect(() => {
-    if (new URL(window.location.href).searchParams.get("visao") === "classificacao") setAba("classificacao")
+    const visao = new URL(window.location.href).searchParams.get("visao")
+    if (visao && visao in ABAS) setAba(visao as Aba)
   }, [])
   function trocarAba(nova: Aba) {
     const url = new URL(window.location.href)
-    if (nova === "geral") url.searchParams.delete("visao")
+    if (nova === "compras") url.searchParams.delete("visao")
     else url.searchParams.set("visao", nova)
     window.history.replaceState(null, "", url)
     setAba(nova)
@@ -151,6 +157,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
     filtro,
   }
   const chave = JSON.stringify(selecao)
+  const capitulo = aba === "compras" || aba === "vendas" || aba === "dre" || aba === "fluxo"
   const chaveSerie = JSON.stringify({ ...selecao, recorte: { ...selecao.recorte, ano: null } })
 
   return (
@@ -189,6 +196,8 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
               ))}
             </select>
           </Campo>
+          {!capitulo && (
+          <>
           <Campo rotulo="Ano">
             <select value={ano} onChange={(e) => setAno(Number(e.target.value))}>
               {anos.map((a) => (
@@ -225,7 +234,14 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
               ))}
             </div>
           </Campo>
-          {filtro && (
+          </>
+          )}
+          {capitulo && (
+            <p className="sub" style={{ alignSelf: "center", margin: 0 }}>
+              Compras e listas de vendas em 2027 (o ano das ações); DRE e fluxo de caixa de 2027 a 2033, nos três cenários de venda.
+            </p>
+          )}
+          {!capitulo && filtro && (
             <span className="chip">
               {DIMENSOES_RANKING[filtro.dimensao]}: {rotuloValor(filtro.dimensao, filtro.valor)}
               <button aria-label="Remover filtro" onClick={() => setFiltro(null)}>
@@ -244,7 +260,15 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
         ))}
       </nav>
 
-      {aba === "geral" ? (
+      {aba === "compras" ? (
+        <Compras calculoId={calculo.id} regime={regime} />
+      ) : aba === "vendas" ? (
+        <Vendas calculoId={calculo.id} regime={regime} />
+      ) : aba === "dre" ? (
+        <Dre calculoId={calculo.id} regime={regime} />
+      ) : aba === "fluxo" ? (
+        <Fluxo calculoId={calculo.id} regime={regime} />
+      ) : aba === "geral" ? (
         <>
           <Resumo calculoId={calculo.id} selecao={selecao} chave={chave} />
 
@@ -274,7 +298,14 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
   )
 }
 
-const ABAS = { geral: "Visão geral", classificacao: "Classificação CST / cClassTrib" } as const
+const ABAS = {
+  compras: "Compras",
+  vendas: "Vendas",
+  dre: "DRE",
+  fluxo: "Fluxo de caixa",
+  geral: "Visão geral",
+  classificacao: "Classificação CST / cClassTrib",
+} as const
 type Aba = keyof typeof ABAS
 
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
