@@ -1,10 +1,11 @@
 "use client"
 import { useEffect, useMemo, useState } from "react"
 import type { Calculo, CalculoDetalhe } from "@pricetax/sdk"
+import type { RamoId } from "@/lib/auditoria"
 import { REGIMES } from "@/lib/catalogo"
 import { Auditoria } from "./Auditoria"
 import { Erro } from "./comum"
-import { Executivo } from "./Executivo"
+import { Historia } from "./Historia"
 import { api, fmtCnpj, fmtMes, useBusca } from "./util"
 
 export type Detalhe = CalculoDetalhe & { raiz: { inicio: string | null; fim: string | null } }
@@ -18,7 +19,7 @@ export type Escolha = {
   cenarioCompras: string
 }
 
-const ABAS = { reforma: "Reforma na empresa", auditoria: "Auditoria de IBS e CBS" } as const
+const ABAS = { reforma: "A Reforma na empresa", auditoria: "Auditoria de IBS e CBS" } as const
 type Aba = keyof typeof ABAS
 
 export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
@@ -110,41 +111,50 @@ export function textoRaiz(c: Detalhe) {
     .join(", ")
 }
 
+/** "nos 6 meses analisados (jan/2025 a jun/2025)": o período dos números, em uma expressão. */
+function textoPeriodo(c: Detalhe) {
+  const inicio = fmtMes(c.raiz.inicio)
+  const fim = fmtMes(c.raiz.fim)
+  const meses = c.periodo_meses ? `nos ${c.periodo_meses} meses analisados` : "no período analisado"
+  return inicio && fim ? `${meses} (${inicio === fim ? inicio : `${inicio} a ${fim}`})` : meses
+}
+
 function Relatorio({ calculo, calculos, onCalculo }: { calculo: Detalhe; calculos: Calculo[]; onCalculo: (id: string) => void }) {
   const anos = useMemo(() => [...calculo.anos].sort((a, b) => a - b), [calculo.anos])
   const anoPleno = anos[anos.length - 1]
-  const anosTransicao = anos.length > 1 ? anos.slice(0, -1) : anos
+  const anoTransicao = anos.includes(2027) && anoPleno !== 2027 ? 2027 : anos[0]
   const regimeInicial =
     calculo.regime_tributario && calculo.regimes.includes(calculo.regime_tributario) ? calculo.regime_tributario : calculo.regimes[0]
   const cenarioInicial = calculo.cenarios.some((c) => c.id === "base") ? "base" : calculo.cenarios[0]?.id
 
   const [regime, setRegime] = useState(regimeInicial)
-  const [anoTransicao, setAnoTransicao] = useState(anosTransicao.includes(2027) ? 2027 : anosTransicao[0])
+  const [ano, setAno] = useState(anoPleno)
   const [cenarioVendas, setCenarioVendas] = useState(cenarioInicial)
   const [cenarioCompras, setCenarioCompras] = useState(cenarioInicial)
   const [aba, setAba] = useState<Aba>("reforma")
+  const [ramo, setRamo] = useState<RamoId | null>(null)
   const [geradoEm] = useState(() => new Date())
 
   // A aba fica na URL (?visao=auditoria) para dar para compartilhar o link.
   useEffect(() => {
     if (new URL(window.location.href).searchParams.get("visao") === "auditoria") setAba("auditoria")
   }, [])
-  function trocarAba(nova: Aba) {
+  function trocarAba(nova: Aba, ramoEscolhido: RamoId | null = null) {
     const url = new URL(window.location.href)
     if (nova === "reforma") url.searchParams.delete("visao")
     else url.searchParams.set("visao", nova)
     window.history.replaceState(null, "", url)
+    setRamo(ramoEscolhido)
     setAba(nova)
+    window.scrollTo({ top: 0 })
   }
 
-  if (!regime || anoTransicao === undefined || !cenarioVendas || !cenarioCompras) {
+  if (!regime || anoPleno === undefined || !cenarioVendas || !cenarioCompras) {
     return <div className="alerta">Este cálculo ainda não tem regimes, anos ou cenários disponíveis para leitura.</div>
   }
   const escolha: Escolha = { regime, anoTransicao, anoPleno, cenarioVendas, cenarioCompras }
-  const nomeCenario = (id: string, compras: boolean) => {
-    const nome = calculo.cenarios.find((c) => c.id === id)?.nome ?? id
-    return compras && id === "sem_reajuste" ? `${nome} (pior cenário)` : nome
-  }
+  const periodo = textoPeriodo(calculo)
+  const opcoesAno = anoTransicao === anoPleno ? [anoPleno] : [anoTransicao, anoPleno]
 
   return (
     <>
@@ -152,9 +162,49 @@ function Relatorio({ calculo, calculos, onCalculo }: { calculo: Detalhe; calculo
 
       <section className="cabecalho">
         <div>
-          <h1 className="titulo-relatorio">Os efeitos da Reforma Tributária{calculo.empresa ? ` na ${calculo.empresa}` : ""}</h1>
+          <h1 className="titulo-relatorio">A Reforma Tributária{calculo.empresa ? ` na ${calculo.empresa}` : ""}</h1>
           <span className="risca" />
         </div>
+        <p className="origem-linha">
+          <b>Raiz da informação:</b> {textoRaiz(calculo)} · <b>Relatório gerado em:</b> {geradoEm.toLocaleDateString("pt-BR")}
+        </p>
+        <div className="controles">
+          <div className="segmentos" role="group" aria-label="Ano">
+            {opcoesAno.map((a) => (
+              <button key={a} aria-pressed={ano === a} onClick={() => setAno(a)}>
+                {a} · {a === anoPleno ? "reforma completa" : "transição"}
+              </button>
+            ))}
+          </div>
+          <Campo rotulo="Regime">
+            <select value={regime} onChange={(e) => setRegime(e.target.value)}>
+              {calculo.regimes.map((r) => (
+                <option key={r} value={r}>
+                  {REGIMES[r] ?? r}
+                  {r === calculo.regime_tributario ? " (atual)" : ""}
+                </option>
+              ))}
+            </select>
+          </Campo>
+        </div>
+      </section>
+
+      <nav className="abas" aria-label="Visões">
+        {(Object.keys(ABAS) as Aba[]).map((a) => (
+          <button key={a} aria-current={aba === a ? "page" : undefined} onClick={() => trocarAba(a)}>
+            {ABAS[a]}
+          </button>
+        ))}
+      </nav>
+
+      {aba === "reforma" ? (
+        <Historia calculo={calculo} escolha={escolha} ano={ano} periodo={periodo} onAbrirAuditoria={(r) => trocarAba("auditoria", r)} />
+      ) : (
+        <Auditoria key={`${ramo}`} calculo={calculo} escolha={escolha} ano={ano} periodo={periodo} ramoInicial={ramo} />
+      )}
+
+      <details className="ver-detalhes premissas">
+        <summary>Premissas e origem dos dados</summary>
         <div className="origens">
           <span>
             <b>Raiz da informação:</b> {textoRaiz(calculo)}
@@ -177,75 +227,34 @@ function Relatorio({ calculo, calculos, onCalculo }: { calculo: Detalhe; calculo
               </select>
             </Campo>
           )}
-          <Campo rotulo="Regime">
-            <select value={regime} onChange={(e) => setRegime(e.target.value)}>
-              {calculo.regimes.map((r) => (
-                <option key={r} value={r}>
-                  {REGIMES[r] ?? r}
-                  {r === calculo.regime_tributario ? " (atual)" : ""}
+          <Campo rotulo="Preço de venda">
+            <select value={cenarioVendas} onChange={(e) => setCenarioVendas(e.target.value)}>
+              {calculo.cenarios.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
                 </option>
               ))}
             </select>
           </Campo>
-          <Campo rotulo="Ano de transição">
-            <select value={anoTransicao} onChange={(e) => setAnoTransicao(Number(e.target.value))}>
-              {anosTransicao.map((a) => (
-                <option key={a} value={a}>
-                  {a}
+          <Campo rotulo="Preço dos fornecedores">
+            <select value={cenarioCompras} onChange={(e) => setCenarioCompras(e.target.value)}>
+              {calculo.cenarios.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.id === "sem_reajuste" ? `${c.nome} (pior cenário)` : c.nome}
                 </option>
               ))}
             </select>
           </Campo>
-          {aba === "reforma" && (
-            <>
-              <Campo rotulo="Vendas">
-                <select value={cenarioVendas} onChange={(e) => setCenarioVendas(e.target.value)}>
-                  {calculo.cenarios.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {nomeCenario(c.id, false)}
-                    </option>
-                  ))}
-                </select>
-              </Campo>
-              <Campo rotulo="Compras">
-                <select value={cenarioCompras} onChange={(e) => setCenarioCompras(e.target.value)}>
-                  {calculo.cenarios.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {nomeCenario(c.id, true)}
-                    </option>
-                  ))}
-                </select>
-              </Campo>
-            </>
-          )}
-          <a className="botao" href={linkExportar(calculo.id, escolha)} download>
+          <a className="botao" href={linkExportar(calculo.id, { ...escolha, anoTransicao: ano })} download>
             Baixar dados (CSV)
           </a>
         </div>
-      </section>
-
-      <nav className="abas" aria-label="Visões">
-        {(Object.keys(ABAS) as Aba[]).map((a) => (
-          <button key={a} aria-current={aba === a ? "page" : undefined} onClick={() => trocarAba(a)}>
-            {ABAS[a]}
-          </button>
-        ))}
-      </nav>
-
-      {aba === "reforma" ? (
-        <Executivo calculo={calculo} escolha={escolha} onAnoTransicao={setAnoTransicao} />
-      ) : (
-        <Auditoria calculo={calculo} escolha={escolha} />
-      )}
-
-      <div className="origens">
-        <span>
-          <b>Raiz da informação:</b> {textoRaiz(calculo)}
-        </span>
-        <span>
-          <b>Relatório gerado em:</b> {geradoEm.toLocaleDateString("pt-BR")}
-        </span>
-      </div>
+        <p className="nota">
+          Ajustado: o preço é recalculado para manter a margem de hoje. Sem Reajuste: o preço de venda não muda; nas compras, o fornecedor repassa o
+          novo imposto sobre o valor cheio. Os valores são do período analisado. A Auditoria usa sempre o Ajustado como referência. Esta visão não
+          traz DRE nem fluxo de caixa, porque a API de cálculos não informa despesas, IR e CSLL.
+        </p>
+      </details>
     </>
   )
 }

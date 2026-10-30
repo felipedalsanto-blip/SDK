@@ -5,17 +5,23 @@ cliente, a partir dos cálculos da Pricetax via [`@pricetax/sdk`](https://develo
 Padrão visual Vitória (Montserrat, amarelo `#FFD700`, preto `#1A1A1A`, cinza `#6B6B6B`), com modo
 claro e escuro.
 
-**Aba Reforma na empresa:** o caso em uma leitura, os quatro números da reforma (Hoje × ano de
-transição × regime pleno), a curva dos tributos a recolher de 2026 a 2033, compras e insumos, vendas
-e preço, comparação de regimes (com os regimes vedados pela receita), sensibilidade ao pior cenário
-de compras e plano de ação.
+**Aba A Reforma na empresa**, uma história em 4 passos, um ano por vez (2027, transição, ou
+2033, reforma completa):
 
-**Aba Auditoria de IBS e CBS:** o indicador **DJF, Dinheiro Jogado Fora**, do macro ao micro:
+1. **Quanto muda?** O imposto sobre o consumo a pagar no ano escolhido contra hoje, em um número.
+2. **Por que muda?** Imposto sobre as vendas e crédito nas compras, cada um com a sua variação.
+3. **Onde a empresa está perdendo dinheiro?** O DJF e as quatro causas, que levam à Auditoria.
+4. **O que fazer?** As três ações de maior valor, com o primeiro fornecedor ou item de cada uma.
 
-1. fornecedor repassando o tributo sobre o valor cheio (Sem Reajuste × Ajustado, nas compras), até os itens de cada fornecedor;
-2. preço de venda sem reajuste (Ajustado × Sem Reajuste, nas vendas), até os clientes de cada item;
-3. crédito de IBS e CBS deixado na mesa (cClassTrib da nota de compra × calculado);
-4. IBS e CBS destacado a mais nas vendas (cClassTrib da nota de venda × calculado).
+Tabelas e o ano a ano ficam em "ver detalhes"; premissas (cenários de preço) e o download do CSV, no fim.
+
+**Aba Auditoria de IBS e CBS:** o indicador **DJF, Dinheiro Jogado Fora**, por causa, do total ao
+fornecedor, ao item e ao cliente:
+
+1. fornecedores cobrando a mais (repassam o novo imposto sobre o preço cheio: Sem Reajuste × Ajustado);
+2. preço de venda desatualizado (Ajustado × Sem Reajuste, nas vendas);
+3. crédito que ficou para trás (cClassTrib da nota de compra × calculado);
+4. imposto pago a mais nas vendas (cClassTrib da nota de venda × calculado).
 
 O risco fiscal (tributo a menor, crédito a maior) aparece à parte: é passivo, não DJF.
 

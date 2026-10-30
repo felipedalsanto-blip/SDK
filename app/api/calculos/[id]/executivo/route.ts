@@ -5,9 +5,9 @@ export const dynamic = "force-dynamic"
 
 type Ctx = { params: Promise<{ id: string }> }
 
-/** Visão executiva: Hoje × ano de transição (o ano do recorte) × regime pleno (último ano). */
+/** Visão executiva: Hoje e cada ano da reforma, no regime e nos cenários escolhidos. */
 export const POST = rota(async (req, { params }: Ctx) => {
   const { id } = await params
   const { calculo, recorte } = await lerSelecao(id, await lerJson(req))
-  return Response.json(await montarExecutivo(calculo, recorte, recorte.ano))
+  return Response.json(await montarExecutivo(calculo, recorte))
 })

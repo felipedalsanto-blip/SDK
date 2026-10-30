@@ -114,6 +114,9 @@ main { max-width: 1200px; margin: 0 auto; padding: var(--espaco); display: grid;
 }
 .origens b { color: var(--amarelo); font-weight: 700; }
 
+.origem-linha { margin: -4px 0 0; font-size: 12px; color: var(--texto-apoio); }
+.origem-linha b { color: var(--texto); font-weight: 700; }
+
 /* Seletores. */
 .controles { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; }
 .campo { display: grid; gap: 4px; min-width: 0; }
@@ -156,37 +159,12 @@ select:focus-visible, button:focus-visible { outline: 2px solid var(--amarelo); 
 .bloco strong { color: var(--branco-neutro); }
 .bloco .chave { color: var(--amarelo); font-weight: 700; }
 
-/* Cartão de indicador: rótulo, valores por cenário e linha de contexto. */
-.kpi { display: grid; gap: 12px; align-content: start; }
-.kpi .rotulo { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texto-apoio); }
-.kpi .linha-cenario { display: grid; grid-template-columns: 4px 1fr; gap: 10px; align-items: stretch; }
-.kpi .marca-cenario { border-radius: 2px; }
-.kpi .ano { font-size: 11px; font-weight: 700; color: var(--texto-apoio); text-transform: uppercase; letter-spacing: 0.06em; }
-.kpi .valor { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.2; }
-.kpi .valor-menor { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.contexto { font-size: 12px; color: var(--texto-apoio); font-variant-numeric: tabular-nums; }
+.contexto { font-size: 12.5px; color: var(--texto-apoio); font-variant-numeric: tabular-nums; }
 
 /* Legenda dos cenários. */
 .legenda { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12px; color: var(--texto-apoio); font-weight: 600; }
 .legenda span { display: inline-flex; align-items: center; gap: 8px; }
 .legenda i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid var(--linha); }
-
-/* Gráfico de colunas em div, escala a partir do zero. */
-.colunas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; align-items: end; height: 240px; padding-top: 22px; border-bottom: 1px solid var(--texto-apoio); }
-.coluna { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
-.coluna .barra { width: min(56px, 80%); border-radius: 4px 4px 0 0; position: relative; min-height: 2px; }
-.coluna .rotulo-valor { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 4px; white-space: nowrap; }
-.eixo-anos { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; font-size: 11.5px; font-weight: 600; color: var(--texto-apoio); text-align: center; padding-top: 6px; }
-.marcador { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; background: var(--amarelo); color: var(--preto); border-radius: 3px; padding: 1px 6px; margin-bottom: 4px; }
-
-/* Barras horizontais (comparações e DJF). */
-.barras-h { display: grid; gap: 10px; }
-.barra-h { display: grid; grid-template-columns: minmax(110px, 180px) 1fr; gap: 12px; align-items: center; }
-.barra-h .nome { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.barra-h .trilho { display: grid; gap: 4px; }
-.barra-h .preenchimento { height: 14px; border-radius: 0 3px 3px 0; min-width: 2px; }
-.barra-h .valor { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.barra-h .faixa { display: flex; align-items: center; gap: 8px; }
 
 /* Tabelas. */
 .tabela { overflow-x: auto; }
@@ -209,35 +187,21 @@ tbody th { font-weight: 600; text-transform: none; letter-spacing: 0; font-size:
 .carregando { opacity: 0.55; }
 .erro { border: 1px solid var(--linha); border-left: 6px solid var(--texto); background: var(--cartao); border-radius: var(--raio); padding: 14px 16px; }
 
-/* Lista numerada do plano de ação. */
-.passos { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; counter-reset: passo; }
-.passos li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: start; counter-increment: passo; }
-.passos li::before {
-  content: counter(passo); width: 32px; height: 32px; border-radius: 50%; background: var(--amarelo); color: var(--preto);
-  display: grid; place-items: center; font-weight: 800; font-size: 14px;
-}
-.passos b { display: block; margin-bottom: 2px; }
-
 /* DJF: do macro ao micro. */
-.djf-total { display: grid; gap: 6px; }
-.djf-total .numero { font-size: 40px; font-weight: 900; color: var(--amarelo); letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.composicao { display: flex; height: 18px; border-radius: 4px; overflow: hidden; background: var(--grade); gap: 2px; }
-.composicao div { min-width: 2px; }
 .ramos { display: grid; gap: 12px; }
 .ramo { background: var(--cartao); border: 1px solid var(--linha); border-radius: var(--raio); }
 .ramo > button {
   width: 100%; border: 0; background: transparent; cursor: pointer; text-align: left; padding: 16px 20px;
-  display: grid; grid-template-columns: 36px 1fr auto; gap: 14px; align-items: center;
+  display: grid; grid-template-columns: 6px 1fr auto; gap: 16px; align-items: center;
 }
-.ramo .numero-ramo { width: 36px; height: 36px; border-radius: 6px; display: grid; place-items: center; font-weight: 900; font-size: 15px; }
+.marca-causa { align-self: stretch; border-radius: 3px; min-height: 36px; }
 .ramo .titulo-ramo { font-weight: 800; font-size: 14.5px; }
 .ramo .resumo-ramo { font-size: 12.5px; color: var(--texto-apoio); }
 .ramo .valor-ramo { text-align: right; font-variant-numeric: tabular-nums; }
 .ramo .valor-ramo strong { display: block; font-size: 18px; font-weight: 800; }
 .ramo .valor-ramo span { font-size: 12px; color: var(--texto-apoio); }
-.ramo-corpo { border-top: 1px solid var(--linha); padding: 16px 20px 20px 70px; display: grid; gap: 16px; }
-.explicacao { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 20px; font-size: 13px; }
-.explicacao b { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--texto-apoio); margin-bottom: 2px; }
+.ramo-corpo { border-top: 1px solid var(--linha); padding: 16px 20px 20px 42px; display: grid; gap: 12px; }
+.rotulo { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texto-apoio); margin: 0; }
 .galhos { display: grid; gap: 0; border-left: 2px solid var(--amarelo); margin-left: 4px; }
 .galho { position: relative; padding: 10px 0 10px 18px; display: grid; gap: 6px; border-bottom: 1px solid var(--linha); }
 .galho:last-child { border-bottom: 0; }
@@ -248,10 +212,79 @@ tbody th { font-weight: 600; text-transform: none; letter-spacing: 0; font-size:
 .galho-valor { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .galho-barra { height: 6px; border-radius: 3px; background: var(--grade); overflow: hidden; }
 .galho-barra div { height: 100%; background: var(--texto-apoio); }
-.galho button { justify-self: start; border: 0; background: transparent; padding: 0; cursor: pointer; font-size: 12px; font-weight: 700; text-decoration: underline; text-decoration-color: var(--amarelo); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.link { justify-self: start; border: 0; background: transparent; padding: 0; cursor: pointer; font-size: 12px; font-weight: 700; text-decoration: underline; text-decoration-color: var(--amarelo); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .galho .galhos { margin-top: 6px; }
 
+/* Seletor de ano em dois botões. */
+.segmentos { display: inline-flex; border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; background: var(--cartao); align-self: flex-end; }
+.segmentos button { border: 0; background: transparent; padding: 0 16px; height: 36px; cursor: pointer; font-weight: 700; font-size: 13px; white-space: nowrap; color: var(--texto-apoio); }
+.segmentos button + button { border-left: 1px solid var(--linha); }
+.segmentos button[aria-pressed="true"] { background: var(--preto); color: var(--branco-neutro); box-shadow: inset 0 -3px 0 var(--amarelo); }
+
+/* Os quatro passos da história. */
+.passo { background: var(--cartao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 28px; display: grid; gap: 18px; }
+.passo-cabeca { display: flex; align-items: center; gap: 14px; }
+.passo-numero { width: 34px; height: 34px; border-radius: 50%; background: var(--amarelo); color: var(--preto); display: grid; place-items: center; font-weight: 900; font-size: 15px; flex: 0 0 auto; }
+.passo-cabeca h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.04em; }
+.passo-corpo { display: grid; gap: 16px; padding-left: 48px; }
+.numero-gigante { font-size: 44px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.05; margin: 0; font-variant-numeric: tabular-nums; }
+.frase { font-size: 16px; margin: -8px 0 0; max-width: 640px; color: var(--texto-apoio); }
+.frase b { color: var(--texto); }
+
+.comparativo { display: grid; gap: 10px; max-width: 640px; }
+.comparativo-linha { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; }
+.comparativo-rotulo { font-size: 12px; font-weight: 700; color: var(--texto-apoio); }
+.comparativo-trilho { height: 22px; background: var(--grade); border-radius: 4px; overflow: hidden; }
+.comparativo-trilho div { height: 100%; border-radius: 4px; }
+.comparativo-valor { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 120px; text-align: right; }
+
+.motivo { display: grid; gap: 6px; }
+.motivo-valor { font-size: 30px; font-weight: 900; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+
+.causas { display: grid; gap: 10px; max-width: 720px; }
+.causa { border: 1px solid var(--linha); background: var(--cartao); border-radius: var(--raio); padding: 12px 14px; cursor: pointer; text-align: left; display: grid; gap: 8px; }
+.causa:hover { border-color: var(--texto-apoio); }
+.causa:disabled { cursor: default; opacity: 0.6; }
+.causa-topo { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.causa-nome { font-weight: 700; }
+.causa-valor { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.causa-trilho { height: 8px; background: var(--grade); border-radius: 4px; overflow: hidden; display: block; }
+.causa-trilho span { display: block; height: 100%; border-radius: 4px; }
+
+.acoes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 720px; counter-reset: acao; }
+.acoes li { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--linha); border-radius: var(--raio); counter-increment: acao; }
+.acoes li::before { content: counter(acao); width: 28px; height: 28px; border-radius: 50%; background: var(--preto); color: var(--amarelo); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.acao-texto { display: grid; gap: 2px; }
+.acao-valor { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Detalhes recolhidos. */
+.ver-detalhes > summary { cursor: pointer; font-weight: 700; font-size: 13px; text-decoration: underline; text-decoration-color: var(--amarelo); text-decoration-thickness: 2px; text-underline-offset: 4px; list-style: none; }
+.ver-detalhes > summary::-webkit-details-marker { display: none; }
+.ver-detalhes[open] > summary { margin-bottom: 14px; }
+.premissas { display: grid; gap: 14px; }
+.premissas[open] { background: var(--cartao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 18px 20px; }
+.premissas > *:not(summary) + * { margin-top: 14px; }
+
+.mini-colunas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; max-width: 720px; }
+.mini-coluna { display: grid; grid-template-rows: auto 120px auto; gap: 4px; justify-items: center; }
+.mini-valor { font-size: 10.5px; font-weight: 700; color: var(--texto-apoio); white-space: nowrap; }
+.mini-trilho { width: min(32px, 80%); display: flex; align-items: flex-end; }
+.mini-trilho div { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; }
+.mini-ano { font-size: 11px; font-weight: 600; color: var(--texto-apoio); }
+.mini-ano.atual { color: var(--texto); font-weight: 800; }
+
 @media (max-width: 720px) {
+  .abas { gap: 16px; }
+  .abas button { font-size: 11.5px; }
+  .passo { padding: 20px 16px; }
+  .passo-corpo { padding-left: 0; }
+  .numero-gigante { font-size: 34px; }
+  .segmentos { width: 100%; }
+  .segmentos button { flex: 1; padding: 0 8px; font-size: 12px; }
+  .comparativo-valor { min-width: 0; }
+  .mini-valor { display: none; }
+  .acoes li { grid-template-columns: 28px 1fr; }
+  .acao-valor { grid-column: 2; }
   :root { --espaco: 16px; }
   .titulo-relatorio { font-size: 20px; }
   .grade-2 { grid-template-columns: minmax(0, 1fr); }
@@ -261,14 +294,9 @@ tbody th { font-weight: 600; text-transform: none; letter-spacing: 0; font-size:
   .rodape { grid-template-columns: 1fr; text-align: left; }
   .rodape .fonte { text-align: left; }
   .rodape .marca { justify-self: start; }
-  .ramo > button { grid-template-columns: 32px 1fr; }
+  .ramo > button { grid-template-columns: 6px 1fr; }
   .ramo .valor-ramo { grid-column: 2; text-align: left; }
   .ramo-corpo { padding: 16px; }
-  .djf-total .numero { font-size: 32px; }
-  .colunas { gap: 4px; }
-  .coluna .rotulo-valor { display: none; }
-  .barra-h { grid-template-columns: 1fr; gap: 4px; }
-  .barra-h .preenchimento { max-width: 45%; }
   .cartao { padding: 16px; }
   .bloco { padding: 20px 16px; }
 }

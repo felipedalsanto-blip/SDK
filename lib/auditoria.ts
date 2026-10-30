@@ -44,7 +44,6 @@ export type Auditoria = {
   ramos: Ramo[]
   risco: { compras: number; vendas: number; naoEstimadoItens: number }
   periodoMeses: number | null
-  evolucao: { ano: number; repasse: number; preco: number; credito: number; destaque: number }[]
   tabela: { fonte: string; obtidoEm: string }
 }
 
@@ -232,19 +231,6 @@ export async function montarAuditoria(calculo: CalculoDetalhe, recorte: Base, ta
       })),
   })
 
-  // Evolução: o mesmo DJF no ano de transição escolhido e no regime pleno (último ano).
-  const anos = [...calculo.anos].sort((a, b) => a - b)
-  const anosEvolucao = [...new Set([recorte.ano, anos[anos.length - 1]])].sort((a, b) => a - b)
-  const evolucao: Auditoria["evolucao"] = []
-  for (const ano of anosEvolucao) {
-    const r = { ...recorte, ano }
-    const c = temPior ? await ramosDeCenario(id, r) : null
-    const rep = c?.repasse.valor ?? 0
-    const pre = c?.preco.valor ?? 0
-    const imp = await impactoClassificacao(id, { recorte: comCenario(r, AJUSTADO), sentido: "ambas" })
-    evolucao.push({ ano, repasse: rep, preco: pre, credito: imp.ganhoEntrada, destaque: imp.ganhoSaida })
-  }
-
   return {
     ano: recorte.ano,
     regime: recorte.regime,
@@ -252,7 +238,6 @@ export async function montarAuditoria(calculo: CalculoDetalhe, recorte: Base, ta
     ramos,
     risco: { compras: impacto.perdaEntrada, vendas: impacto.perdaSaida, naoEstimadoItens: impacto.naoEstimado.itens },
     periodoMeses: calculo.periodo_meses,
-    evolucao,
     tabela,
   }
 }

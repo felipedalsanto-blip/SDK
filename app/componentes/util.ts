@@ -144,3 +144,7 @@ export function fmtMes(v: string | null) {
   const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
   return m && a ? `${nomes[Number(m) - 1] ?? m}/${a}` : v
 }
+
+const brlInteiro = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
+/** Reais sem centavos, para os números grandes de leitura rápida. */
+export const fmtBRL0 = (v: Valor) => (num(v) === null ? "n/d" : brlInteiro.format(num(v)!))
