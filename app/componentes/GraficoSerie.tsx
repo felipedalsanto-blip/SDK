@@ -101,7 +101,7 @@ export function GraficoSerie({
           ))}
         </g>
         {serie.map((s, i) =>
-          passo < 36 && i % 2 === 1 && s.ano !== anoAtual ? null : (
+          passo < 36 && (i - Math.max(0, serie.findIndex((p) => p.ano === anoAtual))) % 2 !== 0 ? null : (
           <text
             key={s.ano}
             x={x(i)}

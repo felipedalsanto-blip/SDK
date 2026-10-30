@@ -12,6 +12,7 @@ import { api, fmtBRL, fmtCnpj, fmtInt, fmtPct, pontos, useBusca, variacao } from
 import { GraficoSerie, type PontoSerie } from "./GraficoSerie"
 import { Ranking } from "./Ranking"
 import { TabelaLinhas } from "./TabelaLinhas"
+import { VisaoClassificacao } from "./VisaoClassificacao"
 import { Erro, rotuloValor } from "./comum"
 
 type Total = Record<string, number | string | boolean | null>
@@ -126,6 +127,19 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
   const [cenarioCompras, setCenarioCompras] = useState(cenarioInicial)
   const [sentido, setSentido] = useState<Sentido>("ambas")
   const [filtro, setFiltro] = useState<Selecao["filtro"]>(null)
+  const [aba, setAba] = useState<Aba>("geral")
+
+  // A aba fica na URL (?visao=classificacao) para dar para compartilhar o link.
+  useEffect(() => {
+    if (new URL(window.location.href).searchParams.get("visao") === "classificacao") setAba("classificacao")
+  }, [])
+  function trocarAba(nova: Aba) {
+    const url = new URL(window.location.href)
+    if (nova === "geral") url.searchParams.delete("visao")
+    else url.searchParams.set("visao", nova)
+    window.history.replaceState(null, "", url)
+    setAba(nova)
+  }
 
   if (!regime || ano === undefined || !cenarioVendas) {
     return <div className="aviso">Este cálculo ainda não tem regimes, anos ou cenários disponíveis para leitura.</div>
@@ -222,23 +236,46 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
         </div>
       </section>
 
-      <Resumo calculoId={calculo.id} selecao={selecao} chave={chave} />
+      <nav className="abas" aria-label="Visões">
+        {(Object.keys(ABAS) as Aba[]).map((a) => (
+          <button key={a} aria-current={aba === a ? "page" : undefined} onClick={() => trocarAba(a)}>
+            {ABAS[a]}
+          </button>
+        ))}
+      </nav>
 
-      <div className="grade-2">
-        <Serie calculoId={calculo.id} selecao={selecao} chave={chaveSerie} anoAtual={ano} onAno={setAno} />
-        <Ranking
-          calculoId={calculo.id}
+      {aba === "geral" ? (
+        <>
+          <Resumo calculoId={calculo.id} selecao={selecao} chave={chave} />
+
+          <div className="grade-2">
+            <Serie calculoId={calculo.id} selecao={selecao} chave={chaveSerie} anoAtual={ano} onAno={setAno} />
+            <Ranking
+              calculoId={calculo.id}
+              selecao={selecao}
+              chave={chave}
+              filtro={filtro ?? null}
+              onFiltrar={(dimensao, valor) => setFiltro({ dimensao, valor })}
+            />
+          </div>
+
+          <TabelaLinhas key={chave} calculoId={calculo.id} selecao={selecao} chave={chave} />
+        </>
+      ) : (
+        <VisaoClassificacao
+          calculo={calculo}
           selecao={selecao}
           chave={chave}
-          filtro={filtro ?? null}
-          onFiltrar={(dimensao, valor) => setFiltro({ dimensao, valor })}
+          chaveProjecao={chaveSerie}
+          onAno={setAno}
         />
-      </div>
-
-      <TabelaLinhas key={chave} calculoId={calculo.id} selecao={selecao} chave={chave} />
+      )}
     </>
   )
 }
+
+const ABAS = { geral: "Visão geral", classificacao: "Classificação CST / cClassTrib" } as const
+type Aba = keyof typeof ABAS
 
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (

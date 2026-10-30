@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cclasstrib:atualizar": "node scripts/atualizar-cclasstrib.mjs"
   },
   "dependencies": {
     "@pricetax/sdk": "^0.1.0",

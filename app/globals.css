@@ -12,6 +12,9 @@
   --series-antes: #2a78d6;
   --series-depois: #eb6834;
   --sobe: #b42d2d;
+  --div-perda: #e34948;
+  --div-ganho: #2a78d6;
+  --ganho-texto: #1c5cab;
   --desce: #1c6b3a;
   --critical: #d03b3b;
   --warning-bg: #fff4d6;
@@ -36,6 +39,9 @@
     --series-antes: #3987e5;
     --series-depois: #d95926;
     --sobe: #f08a8a;
+    --div-perda: #e66767;
+    --div-ganho: #3987e5;
+    --ganho-texto: #86b6ef;
     --desce: #6fcf8f;
     --critical: #e66767;
     --warning-bg: #3a2f10;
@@ -158,3 +164,23 @@ tr.selecionada { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--a
   .filtros .campo { flex: 1 1 140px; }
   .filtros select { width: 100%; }
 }
+
+.abas { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.abas button {
+  border: 0; background: transparent; padding: 10px 14px; cursor: pointer; white-space: nowrap;
+  color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500;
+}
+.abas button:hover { color: var(--text-primary); }
+.abas button[aria-current="page"] { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: 600; }
+.abas button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.codigo { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.nome-codigo { display: block; color: var(--text-muted); font-size: 11.5px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.perda { color: var(--sobe); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ganho { color: var(--ganho-texto); font-weight: 600; font-variant-numeric: tabular-nums; }
+.etiqueta { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-secondary); }
+.matriz td.celula { text-align: right; font-variant-numeric: tabular-nums; min-width: 64px; }
+.matriz td.celula.diagonal { box-shadow: inset 0 0 0 1px var(--border); }
+.matriz th.lado { position: sticky; left: 0; background: var(--surface-1); z-index: 1; }
+.metodologia { color: var(--text-secondary); font-size: 13px; }
+.metodologia li { margin: 4px 0; }
