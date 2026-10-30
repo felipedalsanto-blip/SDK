@@ -108,3 +108,15 @@ uma a uma) e a projeção, uma por ano. Tudo fica em cache no servidor por 10 mi
 ## Ano no topo do painel
 
 O seletor de ano vale para todas as abas: Compras, Vendas, fichas e "Monte a sua visão" passam a ler o ano escolhido (padrão 2027); DRE e fluxo de caixa continuam mostrando todos os anos, com o escolhido em destaque; o Novo produto monta a nota para esse ano.
+
+## Novo produto: fórmulas de formação de preço
+
+O precificador parte do **valor líquido** (custo + margem + outras despesas) que a empresa quer receber livre de tributos e acha o valor da operação que, depois de recolher os tributos por dentro, devolve exatamente esse valor:
+
+- **IBS e CBS**: base = valor líquido; alíquota cheia × (1 − redução do cClassTrib).
+- **ICMS**: base = valor da operação + IBS + CBS (+ IPI quando o destinatário não revende nem industrializa), com gross-up do próprio ICMS.
+- **ISS**: mesma regra do ICMS, com gross-up do ISS.
+- **PIS/COFINS** (hoje): sobre a receita, com o ICMS fora da base (Tema 69, desmarcável).
+- **IPI**: sobre o valor da operação.
+- **ICMS-ST** (só quando ativado ou identificado no histórico do NCM): (operação + IBS + CBS + IPI) × (1 + MVA) × alíquota interna do destino − ICMS próprio; MVA ajustada na venda interestadual.
+- **DIFAL** (venda interestadual a quem não revende): não contribuinte, recolhido pelo remetente, base única, dentro do preço; contribuinte (uso e consumo), recolhido pelo destinatário, base dupla, fora da nota.

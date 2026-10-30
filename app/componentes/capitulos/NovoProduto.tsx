@@ -9,6 +9,7 @@ import {
   precoLiquido,
   simular,
   type Atual,
+  type Destino,
   type Entrada,
   type Metodo,
   type Nota,
@@ -23,6 +24,11 @@ import { Alternar, Bloco, Capitulo, Diferenca, Indicador, LinhasAno, Premissa } 
 
 const TIPOS: Record<Tipo, string> = { produto: "Produto", servico: "Serviço", locacao: "Locação" }
 const NOME_ATUAL: Record<Atual, string> = { icms: "ICMS", iss: "ISS", pis_cofins: "PIS/COFINS", ipi: "IPI" }
+const DESTINOS: Record<Destino, string> = {
+  revenda: "Contribuinte · revenda ou industrialização",
+  consumo: "Contribuinte · uso, consumo ou ativo",
+  final: "Consumidor final não contribuinte",
+}
 const METODOS: Record<Metodo, string> = { transicao: "Transição completa", novos: "Só os novos tributos" }
 const MODOS = { margem: "Margem sobre o preço líquido (%)", markup: "Markup sobre o custo (%)", preco: "Preço líquido informado (R$)" }
 
@@ -47,8 +53,14 @@ function padrao(d: Precificacao): Entrada {
     custo: 100,
     margemModo: "margem",
     margem: 30,
+    despesas: 0,
     ano: d.anos[0],
+    destino: "revenda",
+    interestadual: false,
     hoje: nominais(d.media.ar),
+    tema69: true,
+    st: { ativo: d.media.ar.icms_st > 0, mva: 0, aliqDestino: 0 },
+    difal: { ativo: false, aliqDestino: 0 },
     ipiZfm: false,
     cclass: "000001",
     cheias: cheiasDe(d),
@@ -75,7 +87,7 @@ export function NovoProduto({ calculoId, regime, ano }: { calculoId: string; reg
       salvo = JSON.parse(localStorage.getItem(chave) ?? "{}")
     } catch {}
     const base = padrao(dados)
-    const junto = { ...base, ...salvo }
+    const junto: Entrada = { ...base, ...salvo, st: { ...base.st, ...salvo.st }, difal: { ...base.difal, ...salvo.difal }, hoje: { ...base.hoje, ...salvo.hoje } }
     if (!dados.anos.includes(junto.ano)) junto.ano = base.ano
     setE(junto)
   }, [dados, chave])
@@ -152,8 +164,17 @@ function Simulador({
   const nota = simular(e, e.ano)
   const porAno = d.anos.map((a) => simular(e, a))
   const pl = precoLiquido(e)
+  const liquido = pl + e.despesas
 
-  const aplicarRef = (r: RefNcm) => mudar({ ncm: r.ncm, hoje: nominais(r.ar), cclass: r.classes[0]?.cclass ?? e.cclass })
+  const aplicarRef = (r: RefNcm) =>
+    mudar({
+      ncm: r.ncm,
+      hoje: nominais(r.ar),
+      cclass: r.classes[0]?.cclass ?? e.cclass,
+      st: { ...e.st, ativo: e.st.ativo || r.ar.icms_st > 0 },
+      difal: { ...e.difal, ativo: e.difal.ativo || r.ar.icms_difal > 0 },
+      interestadual: e.interestadual || r.ar.icms_difal > 0,
+    })
   const mudarTipo = (tipo: Tipo) => {
     const hojeTipo =
       tipo === "produto" ? e.hoje : tipo === "servico" ? { ...e.hoje, icms: 0, ipi: 0 } : { ...e.hoje, icms: 0, iss: 0, ipi: 0 }
@@ -252,6 +273,7 @@ function Simulador({
             </select>
           </label>
           <Numero rotulo={e.margemModo === "preco" ? "Preço líquido (R$)" : e.margemModo === "markup" ? "Markup (%)" : "Margem (%)"} valor={e.margem} passo={e.margemModo === "preco" ? 1 : 0.5} onChange={(v) => mudar({ margem: v })} />
+          <Numero rotulo="Outras despesas na nota (R$)" valor={e.despesas} passo={1} onChange={(v) => mudar({ despesas: v })} />
           <label>
             Ano da nota
             <select value={e.ano} onChange={(x) => mudar({ ano: Number(x.target.value) })}>
@@ -264,41 +286,118 @@ function Simulador({
           </label>
         </div>
         <p className="cap-nota">
-          Preço líquido {fmtBRL(pl)} · margem de {pl > 0 ? fmtPct((pl - e.custo) / pl) : "n/d"} sobre o preço líquido · markup de{" "}
+          <b>Valor líquido {fmtBRL(liquido)}</b> (custo + margem + outras despesas: é a base do IBS e da CBS e o que a empresa recebe livre de tributos) ·
+          preço líquido {fmtBRL(pl)} · margem de {pl > 0 ? fmtPct((pl - e.custo) / pl) : "n/d"} sobre o preço líquido · markup de{" "}
           {e.custo > 0 ? fmtPct((pl - e.custo) / e.custo) : "n/d"} sobre o custo.
         </p>
       </Bloco>
 
       <Bloco
-        titulo="3. Tributos de hoje"
+        titulo="3. Operação e tributos de hoje"
         leitura={
           e.metodo === "transicao"
-            ? "Alíquotas nominais, como saem na nota hoje. ICMS, ISS e PIS/COFINS ficam dentro do preço; o IPI vai por fora. Nos anos seguintes elas seguem o cronograma da reforma."
+            ? "Para quem você vende define se o IPI entra na base do ICMS e se há DIFAL. As alíquotas são as de hoje; nos anos da reforma elas seguem o cronograma da EC 132."
             : "Na metodologia só dos novos tributos, estas alíquotas não entram no preço da reforma: servem só para montar a nota de hoje e comparar."
         }
       >
+        {produto && (
+          <div className="np-campos">
+            <label className="np-largo">
+              Destinatário
+              <select value={e.destino} onChange={(x) => mudar({ destino: x.target.value as Destino })}>
+                {Object.entries(DESTINOS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="np-check">
+              <input type="checkbox" checked={e.interestadual} onChange={(x) => mudar({ interestadual: x.target.checked })} />
+              Venda interestadual
+            </label>
+          </div>
+        )}
         <div className="np-campos">
-          {ATUAIS.map((t) => (
-            <Numero key={t} rotulo={`${NOME_ATUAL[t]} (%)`} valor={e.hoje[t]} passo={0.25} onChange={(v) => mudar({ hoje: { ...e.hoje, [t]: v } })} />
-          ))}
-          {e.tipo === "produto" && (
+          {produto && (
+            <Numero
+              rotulo={e.interestadual ? "ICMS interestadual (%)" : "ICMS da operação (%)"}
+              valor={e.hoje.icms}
+              passo={0.5}
+              onChange={(v) => mudar({ hoje: { ...e.hoje, icms: v } })}
+            />
+          )}
+          {e.tipo === "servico" && <Numero rotulo="ISS (%)" valor={e.hoje.iss} passo={0.5} onChange={(v) => mudar({ hoje: { ...e.hoje, iss: v } })} />}
+          <Numero rotulo="PIS/COFINS (%)" valor={e.hoje.pis_cofins} passo={0.05} onChange={(v) => mudar({ hoje: { ...e.hoje, pis_cofins: v } })} />
+          {produto && <Numero rotulo="IPI (%)" valor={e.hoje.ipi} passo={0.5} onChange={(v) => mudar({ hoje: { ...e.hoje, ipi: v } })} />}
+          {produto && (
+            <label className="np-check">
+              <input type="checkbox" checked={e.tema69} onChange={(x) => mudar({ tema69: x.target.checked })} />
+              ICMS fora da base do PIS e da COFINS (Tema 69)
+            </label>
+          )}
+          {produto && (
             <label className="np-check">
               <input type="checkbox" checked={e.ipiZfm} onChange={(x) => mudar({ ipiZfm: x.target.checked })} />
-              Mantém IPI depois de 2027 (concorre com produto da Zona Franca)
+              Mantém IPI depois de 2027 (concorre com a Zona Franca)
             </label>
           )}
         </div>
+        <p className="cap-nota">
+          PIS/COFINS: 9,25% no não cumulativo (Lucro Real) ou 3,65% no cumulativo (Lucro Presumido).
+          {produto && e.destino !== "revenda" ? " Destinatário que não revende: o IPI entra na base do ICMS." : ""}
+          {e.tipo === "servico" ? " Serviço: sem ICMS e sem IPI; ISS do município de 2% a 5%." : ""}
+          {e.tipo === "locacao" ? " Locação de bens: sem ICMS, sem IPI e sem ISS (Súmula Vinculante 31)." : ""}
+        </p>
+
+        {produto && (
+          <div className="np-especiais">
+            <label className="np-check">
+              <input type="checkbox" checked={e.st.ativo} onChange={(x) => mudar({ st: { ...e.st, ativo: x.target.checked } })} />
+              <b>Produto com ICMS-ST</b>
+              {ref && ref.ar.icms_st > 0 && <span className="np-selo">identificado nas suas vendas deste NCM</span>}
+            </label>
+            {e.st.ativo && (
+              <div className="np-campos">
+                <Numero rotulo="MVA original (%)" valor={e.st.mva} passo={1} onChange={(v) => mudar({ st: { ...e.st, mva: v } })} />
+                <Numero rotulo="Alíquota interna do destino (%)" valor={e.st.aliqDestino} passo={0.5} onChange={(v) => mudar({ st: { ...e.st, aliqDestino: v } })} />
+                <span className="cap-sub">
+                  {e.interestadual
+                    ? "Interestadual: a MVA é ajustada pela diferença entre a alíquota interestadual e a interna do destino."
+                    : "Operação interna: MVA original."}{" "}
+                  Inclua o FCP na alíquota do destino, se houver.
+                </span>
+              </div>
+            )}
+            <label className="np-check">
+              <input
+                type="checkbox"
+                checked={e.difal.ativo}
+                disabled={!e.interestadual || e.destino === "revenda"}
+                onChange={(x) => mudar({ difal: { ...e.difal, ativo: x.target.checked } })}
+              />
+              <b>ICMS DIFAL</b>
+              {ref && ref.ar.icms_difal > 0 && <span className="np-selo">identificado nas suas vendas deste NCM</span>}
+              {(!e.interestadual || e.destino === "revenda") && <span className="cap-sub">só em venda interestadual a quem não revende</span>}
+            </label>
+            {e.difal.ativo && e.interestadual && e.destino !== "revenda" && (
+              <div className="np-campos">
+                <Numero rotulo="Alíquota interna do destino (%)" valor={e.difal.aliqDestino} passo={0.5} onChange={(v) => mudar({ difal: { ...e.difal, aliqDestino: v } })} />
+                <span className="cap-sub">
+                  {e.destino === "final"
+                    ? "Não contribuinte: o remetente recolhe, base única (entra no seu preço)."
+                    : "Contribuinte (uso e consumo): o destinatário recolhe, base dupla (custo do cliente, fora da nota)."}{" "}
+                  Inclua o FCP, se houver.
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="np-acoes">
-          <button onClick={() => mudar({ hoje: nominais(d.media.ar) })}>Usar a média das suas vendas</button>
+          <button onClick={() => mudar({ hoje: nominais(d.media.ar) })}>Usar as alíquotas médias das suas vendas</button>
           {ref && <button onClick={() => mudar({ hoje: nominais(ref.ar) })}>Usar as do NCM {ref.ncm}</button>}
         </div>
-        {e.tipo !== "produto" && (
-          <p className="cap-nota">
-            {e.tipo === "servico"
-              ? "Serviço: sem ICMS e sem IPI. Informe o ISS do município (de 2% a 5%)."
-              : "Locação de bens: sem ICMS, sem IPI e sem ISS (Súmula Vinculante 31); hoje só PIS e COFINS."}
-          </p>
-        )}
       </Bloco>
 
       <Bloco titulo="4. cClassTrib e benefício" leitura="A classificação define o CST do IBS e da CBS e a redução de alíquota. A alíquota cheia de cada ano vem das suas vendas no cálculo; dá para ajustar.">
@@ -306,17 +405,17 @@ function Simulador({
       </Bloco>
 
       <div className="cap-kpis">
-        <Indicador rotulo="Preço líquido" valor={fmtBRL(pl)} contexto="custo + margem, sem tributos" />
-        <Indicador rotulo="Nota hoje (AR)" valor={fmtBRL(hoje.vNF)} contexto={`tributos ${fmtPct(hoje.vNF ? (hoje.vNF - pl) / hoje.vNF : 0)} da nota`} />
-        <Indicador rotulo={`Nota em ${e.ano}`} valor={fmtBRL(nota.vNF)} contexto={`tributos ${fmtPct(nota.vNF ? (nota.vNF - pl) / nota.vNF : 0)} da nota`} />
+        <Indicador rotulo="Valor líquido" valor={fmtBRL(liquido)} contexto="o que a empresa recebe livre de tributos" />
+        <Indicador rotulo="Cliente paga hoje (AR)" valor={fmtBRL(hoje.total)} contexto={`tributos ${fmtPct(hoje.total ? (hoje.total - liquido) / hoje.total : 0)} do total`} />
+        <Indicador rotulo={`Cliente paga em ${e.ano}`} valor={fmtBRL(nota.total)} contexto={`tributos ${fmtPct(nota.total ? (nota.total - liquido) / nota.total : 0)} do total`} />
         <Indicador
-          rotulo="Diferença na nota"
-          valor={fmtBRL(nota.vNF - hoje.vNF)}
-          contexto={<>{hoje.vNF ? fmtPct((nota.vNF - hoje.vNF) / hoje.vNF) : ""} para manter o mesmo preço líquido</>}
+          rotulo="Diferença para o cliente"
+          valor={fmtBRL(nota.total - hoje.total)}
+          contexto={<>{hoje.total ? fmtPct((nota.total - hoje.total) / hoje.total) : ""} para manter o mesmo valor líquido</>}
         />
       </div>
 
-      <Bloco titulo={`Formação do preço · hoje × ${e.ano}`} leitura="O mesmo preço líquido, com os tributos de cada momento.">
+      <Bloco titulo={`Formação do preço · hoje × ${e.ano}`} leitura="O mesmo valor líquido, com a base de cada tributo e o gross-up de quem vai por dentro. Ao lado de cada tributo, a alíquota e a base.">
         <div className="cc-colunas">
           <Formacao titulo="Hoje (AR)" n={hoje} e={e} />
           <Formacao titulo={`Em ${e.ano}`} n={nota} e={e} destaque />
@@ -331,8 +430,8 @@ function Simulador({
         <CustoPorPerfil base={baseCliente(hoje, nota)} ano={e.ano} />
       </Bloco>
 
-      <Bloco titulo="Total da nota, ano a ano" leitura="O preço líquido fica igual; muda só o que vai para os tributos. A linha tracejada é a nota de hoje.">
-        <LinhasAno anos={d.anos} ar={hoje.vNF} series={[{ nome: "Total da nota", cor: "var(--pt-amarelo)", valores: porAno.map((x) => x.vNF) }]} />
+      <Bloco titulo="Total pago pelo cliente, ano a ano" leitura="O valor líquido fica igual; muda só o que vai para os tributos. A linha tracejada é o total de hoje.">
+        <LinhasAno anos={d.anos} ar={hoje.total} series={[{ nome: "Total pago pelo cliente", cor: "var(--pt-amarelo)", valores: porAno.map((x) => x.total) }]} />
         <div className="tabela-rolagem">
           <table className="cap-tabela">
             <thead>
@@ -341,7 +440,7 @@ function Simulador({
                 <th className="num">Tributos atuais</th>
                 <th className="num">IBS</th>
                 <th className="num">CBS</th>
-                <th className="num">Total da nota</th>
+                <th className="num">Total pago</th>
                 <th className="num">Contra hoje</th>
               </tr>
             </thead>
@@ -351,7 +450,7 @@ function Simulador({
                 <td className="num">{fmtBRL(atuais(hoje))}</td>
                 <td className="num">—</td>
                 <td className="num">—</td>
-                <td className="num">{fmtBRL(hoje.vNF)}</td>
+                <td className="num">{fmtBRL(hoje.total)}</td>
                 <td className="num">—</td>
               </tr>
               {porAno.map((x) => (
@@ -360,9 +459,9 @@ function Simulador({
                   <td className="num">{fmtBRL(atuais(x))}</td>
                   <td className="num">{fmtBRL(x.valores.ibs)}</td>
                   <td className="num">{fmtBRL(x.valores.cbs)}</td>
-                  <td className="num">{fmtBRL(x.vNF)}</td>
+                  <td className="num">{fmtBRL(x.total)}</td>
                   <td className="num">
-                    <Diferenca valor={x.vNF - hoje.vNF} />
+                    <Diferenca valor={x.total - hoje.total} />
                   </td>
                 </tr>
               ))}
@@ -376,18 +475,21 @@ function Simulador({
       </div>
 
       <Premissa>
-        Metodologia: {e.metodo === "transicao" ? "transição completa (tributos atuais que restam + IBS e CBS)" : "só os novos tributos (preço líquido + IBS e CBS)"}.
-        Classificação por NCM ou NBS na calculadora oficial da Receita (dados abertos); a escolha final do cClassTrib é sua. Simulação a partir dos dados que você informa; nada é gravado na Pricetax (fica salvo só neste navegador). Alíquotas de referência: as das suas vendas no
-        cálculo, medidas sobre o valor sem tributos. Tributos atuais pelo cronograma da EC 132/2023: PIS e COFINS extintos e IPI zerado em 2027 (fora a Zona Franca);
-        ICMS e ISS a 90%, 80%, 70% e 60% de 2029 a 2032 e extintos em 2033. IBS e CBS por fora, sobre o preço líquido, com a redução do cClassTrib. Não considera
-        ICMS-ST, DIFAL, Imposto Seletivo nem regimes específicos.
+        Metodologia: {e.metodo === "transicao" ? "transição completa (tributos atuais que restam + IBS e CBS)" : "só os novos tributos (valor líquido + IBS e CBS)"}.
+        Bases: IBS e CBS sobre o valor líquido (custo + margem + outras despesas); ICMS sobre o valor da operação + IBS + CBS (+ IPI para quem não
+        revende), com gross-up do próprio ICMS; ISS da mesma forma, com gross-up do ISS; PIS/COFINS de hoje sobre a receita (sem o ICMS, se marcado o
+        Tema 69); IPI sobre o valor da operação; ICMS-ST e DIFAL só quando informados. Cronograma da EC 132/2023: PIS e COFINS extintos e IPI zerado em
+        2027 (fora a Zona Franca); ICMS e ISS a 90%, 80%, 70% e 60% de 2029 a 2032 e extintos em 2033. Classificação pela calculadora oficial da Receita;
+        a escolha final do cClassTrib é sua. Não considera Imposto Seletivo nem regimes específicos. Nada é gravado na Pricetax (fica só neste navegador).
         {d.parcial ? " Parte dos NCMs ficou fora da leitura por limite de grupos." : ""}
       </Premissa>
     </Capitulo>
   )
 }
 
-const atuais = (n: Nota) => n.valores.icms + n.valores.iss + n.valores.pis_cofins + n.valores.ipi
+/** ICMS, ST, DIFAL do remetente, ISS, PIS/COFINS e IPI: o que ainda é tributo atual na nota. */
+const atuais = (n: Nota) =>
+  n.valores.icms + n.valores.icms_st + (n.difalPagoPor === "remetente" ? n.valores.icms_difal : 0) + n.valores.iss + n.valores.pis_cofins + n.valores.ipi
 
 function Numero({ rotulo, valor, passo, onChange }: { rotulo: string; valor: number; passo: number; onChange: (v: number) => void }) {
   return (
@@ -572,33 +674,38 @@ function Classificacao({ e, mudar, d }: { e: Entrada; mudar: (p: Partial<Entrada
 }
 
 function Formacao({ titulo, n, e, destaque = false }: { titulo: string; n: Nota; e: Entrada; destaque?: boolean }) {
-  const linha = (nome: string, valor: number, aliq?: number, classe?: string) =>
+  const linha = (nome: string, valor: number, detalhe?: string, classe?: string) =>
     Math.abs(valor) < 0.005 && !classe ? null : (
-      <div className={`memoria-linha${classe ? ` ${classe}` : ""}`}>
+      <div key={nome} className={`memoria-linha${classe ? ` ${classe}` : ""}`}>
         <span>
           {nome}
-          {aliq ? <span className="memoria-aliq"> {fmtPct(aliq)}</span> : null}
+          {detalhe ? <span className="memoria-aliq"> {detalhe}</span> : null}
         </span>
         <span className="num">{fmtBRL(valor)}</span>
       </div>
     )
+  const sobre = (aliq: number, base: number) => `${fmtPct(aliq)} × ${fmtBRL(base)}`
+  const v = n.valores
   return (
     <div className={`memoria-coluna${destaque ? " destaque" : ""}`}>
       <h4>{titulo}</h4>
-      {linha("Custo líquido", e.custo, undefined, "total")}
-      {linha("(+) Margem", n.pl - e.custo)}
-      {linha("= Preço líquido", n.pl, undefined, "total")}
-      {linha("(+) ICMS por dentro", n.valores.icms, n.nominal.icms)}
-      {linha("(+) ISS por dentro", n.valores.iss, n.nominal.iss)}
-      {linha("(+) PIS/COFINS por dentro", n.valores.pis_cofins, n.nominal.pis_cofins)}
-      {linha("= Valor do produto (vProd)", n.vProd, undefined, "total")}
-      {linha("(+) IPI por fora", n.valores.ipi, n.nominal.ipi)}
-      {linha("(+) IBS por fora", n.valores.ibs, n.efetiva.ibs)}
-      {linha("(+) CBS por fora", n.valores.cbs, n.efetiva.cbs)}
-      {linha("= Total da nota (vNF)", n.vNF, undefined, "resultado")}
+      {linha("Custo líquido", e.custo)}
+      {linha("(+) Margem", n.precoLiquido - e.custo)}
+      {linha("(+) Outras despesas (frete, seguro…)", n.despesas)}
+      {linha("= Valor líquido", n.liquido, n.periodo === "ar" ? undefined : "base do IBS e da CBS", "total")}
+      {linha("(+) IBS", v.ibs, n.periodo === "ar" ? undefined : sobre(n.efetiva.ibs, n.bases.ibsCbs))}
+      {linha("(+) CBS", v.cbs, n.periodo === "ar" ? undefined : sobre(n.efetiva.cbs, n.bases.ibsCbs))}
+      {linha("(+) ICMS por dentro (gross-up)", v.icms, sobre(n.aliq.icms, n.bases.icms))}
+      {linha("(+) ISS por dentro (gross-up)", v.iss, sobre(n.aliq.iss, n.bases.iss))}
+      {linha("(+) PIS/COFINS", v.pis_cofins, sobre(n.aliq.pisCofins, n.bases.pisCofins))}
+      {n.difalPagoPor === "remetente" && linha("(+) DIFAL pago por você", v.icms_difal, sobre(n.aliq.difalDestino - n.aliq.icms, n.bases.difal))}
+      {linha("(+) IPI", v.ipi, sobre(n.aliq.ipi, n.bases.ipi))}
+      {linha("(+) ICMS-ST", v.icms_st, `${fmtPct(n.aliq.stDestino)} × ${fmtBRL(n.bases.st)} (MVA ${fmtPct(n.aliq.mva)}) − ICMS próprio`)}
+      {linha("= Total pago pelo cliente", n.total, undefined, "resultado")}
+      {n.difalPagoPor === "destinatario" && linha("DIFAL pago pelo cliente (fora da nota)", v.icms_difal, sobre(n.aliq.difalDestino, n.bases.difal), "ajuste")}
       <div className="memoria-linha ajuste">
-        <span>Tributos sobre o preço líquido</span>
-        <span className="num">{n.pl ? fmtPct((n.vNF - n.pl) / n.pl) : "n/d"}</span>
+        <span>Tributos sobre o valor líquido</span>
+        <span className="num">{n.liquido ? fmtPct((n.total - n.liquido) / n.liquido) : "n/d"}</span>
       </div>
     </div>
   )
@@ -607,23 +714,31 @@ function Formacao({ titulo, n, e, destaque = false }: { titulo: string; n: Nota;
 function CamposNota({ n, e }: { n: Nota; e: Entrada }) {
   const c = CCLASS[e.cclass]
   const red = (f: number | null) => (f === null ? "regra própria" : fmtPct(1 - f))
+  const v = n.valores
+  const trio = (base: number, aliq: number, valor: number) => `${fmtBRL(base)} · ${fmtPct(aliq)} · ${fmtBRL(valor)}`
   const linhas: [string, string, string][] = [
-    ["Valor do produto ou serviço", "vProd", fmtBRL(n.vProd)],
-    ...(n.valores.icms > 0.005 ? ([["ICMS · base, alíquota e valor", "vBC · pICMS · vICMS", `${fmtBRL(n.vProd)} · ${fmtPct(n.nominal.icms)} · ${fmtBRL(n.valores.icms)}`]] as [string, string, string][]) : []),
-    ...(n.valores.iss > 0.005 ? ([["ISS · base, alíquota e valor", "vBC · vAliq · vISSQN", `${fmtBRL(n.vProd)} · ${fmtPct(n.nominal.iss)} · ${fmtBRL(n.valores.iss)}`]] as [string, string, string][]) : []),
-    ...(n.valores.pis_cofins > 0.005 ? ([["PIS/COFINS · alíquota e valor", "pPIS+pCOFINS · vPIS+vCOFINS", `${fmtPct(n.nominal.pis_cofins)} · ${fmtBRL(n.valores.pis_cofins)}`]] as [string, string, string][]) : []),
-    ...(n.valores.ipi > 0.005 ? ([["IPI · alíquota e valor", "pIPI · vIPI", `${fmtPct(n.nominal.ipi)} · ${fmtBRL(n.valores.ipi)}`]] as [string, string, string][]) : []),
+    [e.tipo === "produto" ? "Valor do produto (com ICMS dentro)" : "Valor do serviço (com ISS dentro)", "vProd", fmtBRL(n.vProd)],
+  ]
+  const se = (cond: boolean, l: [string, string, string]) => cond && linhas.push(l)
+  se(n.despesas > 0.005, ["Frete, seguro e outras despesas", "vFrete + vSeg + vOutro", fmtBRL(n.despesas)])
+  se(v.icms > 0.005, ["ICMS · base, alíquota e valor", "vBC · pICMS · vICMS", trio(n.bases.icms, n.aliq.icms, v.icms)])
+  se(v.icms_st > 0.005, ["ICMS-ST · base, MVA, alíquota e valor", "vBCST · pMVAST · pICMSST · vICMSST", `${fmtBRL(n.bases.st)} · ${fmtPct(n.aliq.mva)} · ${fmtPct(n.aliq.stDestino)} · ${fmtBRL(v.icms_st)}`])
+  se(n.difalPagoPor === "remetente", ["DIFAL · base, alíquotas e valor", "vBCUFDest · pICMSUFDest · pICMSInter · vICMSUFDest", `${fmtBRL(n.bases.difal)} · ${fmtPct(n.aliq.difalDestino)} · ${fmtPct(n.aliq.icms)} · ${fmtBRL(v.icms_difal)}`])
+  se(v.iss > 0.005, ["ISS · base, alíquota e valor", "vBC · vAliq · vISSQN", trio(n.bases.iss, n.aliq.iss, v.iss)])
+  se(v.pis_cofins > 0.005, ["PIS/COFINS · base, alíquota e valor", "vBC · pPIS+pCOFINS · vPIS+vCOFINS", trio(n.bases.pisCofins, n.aliq.pisCofins, v.pis_cofins)])
+  se(v.ipi > 0.005, ["IPI · base, alíquota e valor", "vBC · pIPI · vIPI", trio(n.bases.ipi, n.aliq.ipi, v.ipi)])
+  linhas.push(
     ["CST do IBS e da CBS", "CST", c ? `${c.cst} · ${CST[c.cst]?.nome ?? ""}` : "—"],
     ["Classificação tributária", "cClassTrib", c ? `${e.cclass} · ${c.nome}` : e.cclass],
-    ["Base de cálculo do IBS e da CBS", "vBC", fmtBRL(n.pl)],
+    ["Base do IBS e da CBS (valor líquido)", "vBC", fmtBRL(n.bases.ibsCbs)],
     ["IBS · alíquota cheia (UF + município)", "pIBSUF + pIBSMun", n.cheia.ibs === null ? "—" : fmtPct(n.cheia.ibs)],
     ["IBS · redução e alíquota efetiva", "pRedAliq · pAliqEfet", `${red(n.fator.ibs)} · ${fmtPct(n.efetiva.ibs)}`],
-    ["IBS · valor", "vIBS", fmtBRL(n.valores.ibs)],
+    ["IBS · valor", "vIBS", fmtBRL(v.ibs)],
     ["CBS · alíquota cheia", "pCBS", n.cheia.cbs === null ? "—" : fmtPct(n.cheia.cbs)],
     ["CBS · redução e alíquota efetiva", "pRedAliq · pAliqEfet", `${red(n.fator.cbs)} · ${fmtPct(n.efetiva.cbs)}`],
-    ["CBS · valor", "vCBS", fmtBRL(n.valores.cbs)],
-    ["Total da nota", "vNF", fmtBRL(n.vNF)],
-  ]
+    ["CBS · valor", "vCBS", fmtBRL(v.cbs)],
+    ["Total pago pelo cliente (produto + despesas + IPI + ST + IBS + CBS)", "vNF", fmtBRL(n.total)],
+  )
   return (
     <div className="tabela-rolagem">
       <table className="cap-tabela np-nota">
@@ -647,7 +762,9 @@ function CamposNota({ n, e }: { n: Nota; e: Entrada }) {
         </tbody>
       </table>
       <p className="cap-nota">
-        O IBS aparece somado (estado + município): o cálculo não separa as duas parcelas. Confira as tags com o leiaute vigente da NF-e ou da NFS-e.
+        O IBS aparece somado (estado + município): o cálculo não separa as duas parcelas.
+        {n.difalPagoPor === "destinatario" ? ` DIFAL de ${fmtBRL(v.icms_difal)} recolhido pelo destinatário, fora da nota.` : ""} Confira as tags com o leiaute
+        vigente da NF-e ou da NFS-e.
       </p>
     </div>
   )
