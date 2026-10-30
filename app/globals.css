@@ -25,7 +25,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --surface-0: #121211;
     --surface-1: #1a1a19;
@@ -48,6 +48,29 @@
     --warning-border: #c98500;
     --shadow: none;
   }
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #262624;
+    --border: #33332f;
+    --grid: #2c2c29;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #96958c;
+    --accent: #3987e5;
+    --series-antes: #3987e5;
+    --series-depois: #d95926;
+    --sobe: #f08a8a;
+    --div-perda: #e66767;
+    --div-ganho: #3987e5;
+    --ganho-texto: #86b6ef;
+    --desce: #6fcf8f;
+    --critical: #e66767;
+    --warning-bg: #3a2f10;
+    --warning-border: #c98500;
+    --shadow: none;
 }
 
 * { box-sizing: border-box; }
@@ -195,13 +218,20 @@ tr.selecionada { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--a
   --pt-eixo: #8a8a8a;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --pt-preto: #f0efec;
     --pt-cinza: #8c8c8c;
     --pt-cinza-medio: #5c5c5c;
     --pt-borda-amarelo: transparent;
     --pt-eixo: #8a8a8a;
   }
+}
+:root[data-theme="dark"] {
+    --pt-preto: #f0efec;
+    --pt-cinza: #8c8c8c;
+    --pt-cinza-medio: #5c5c5c;
+    --pt-borda-amarelo: transparent;
+    --pt-eixo: #8a8a8a;
 }
 
 .topo { background: #1a1a1a; color: #f5f5f5; border-bottom: 3px solid var(--pt-amarelo); }
@@ -398,3 +428,40 @@ main > *, .cap > *, .cap-bloco > * { min-width: 0; }
   .memoria { grid-template-columns: minmax(0, 1fr); }
   .ficha-corpo { padding: 14px; }
 }
+
+/* Custo do seu cliente, com a régua da carteira. */
+.cc { display: grid; gap: 12px; }
+.cc-resultado { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-end; background: #1a1a1a; color: #f5f5f5; border-radius: 12px; padding: 16px 18px; border-left: 6px solid var(--pt-amarelo); }
+.cc-resultado > div:first-child { display: grid; gap: 2px; }
+.cc-resultado .cap-kpi-rotulo, .cc-resultado .cap-kpi-contexto { color: #c9c9c9; }
+.cc-valor { font-size: 26px; font-weight: 800; color: var(--pt-amarelo); font-variant-numeric: tabular-nums; }
+.cc-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cc-acoes button { border: 1px solid #3a3a3a; background: #2a2a2a; color: #f5f5f5; border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
+.cc-total { font-size: 12.5px; font-weight: 700; padding: 6px 10px; border-radius: 999px; background: #2a2a2a; }
+.cc-total.alerta { background: var(--pt-amarelo); color: #1a1a1a; }
+.cc-grupo td { background: var(--surface-2); font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); }
+.cc-regua { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 12.5px; }
+.cc-regua input[type="range"] { width: 130px; accent-color: #1a1a1a; }
+.cc-regua input[type="number"] { width: 58px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); font: inherit; text-align: right; }
+.cc-regua-th { min-width: 230px; }
+.cc-detalhe > td { background: var(--surface-2); }
+.cc-colunas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 6px 0; }
+.cc-colunas .memoria-coluna { background: var(--surface-1); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cc-regua input[type="range"] { accent-color: var(--pt-amarelo); } }
+:root[data-theme="dark"] .cc-regua input[type="range"] { accent-color: var(--pt-amarelo); }
+@media (max-width: 720px) { .cc-colunas { grid-template-columns: minmax(0, 1fr); } }
+
+/* Premissas do IRPJ e da CSLL. */
+.cap-premissas-ir { display: grid; gap: 8px; border: 1px dashed var(--border); border-left: 4px solid var(--pt-amarelo); border-radius: 10px; padding: 12px 14px; }
+.cap-premissas-campos { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: flex-end; }
+.cap-premissas-campos label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.cap-premissas-linha { display: inline-flex; gap: 6px; }
+.cap-premissas-campos input { width: 110px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); font: inherit; text-align: right; }
+.cap-premissas-campos .cap-sub { flex-basis: 100%; }
+
+/* Botão de tema (claro, escuro ou o do sistema). */
+.topo-acoes { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.tema { display: inline-flex; border: 1px solid #3a3a3a; border-radius: 999px; padding: 2px; background: #2a2a2a; }
+.tema button { border: 0; background: transparent; color: #c9c9c9; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.tema button[aria-pressed="true"] { background: var(--pt-amarelo); color: #1a1a1a; }
+.tema button:focus-visible { outline: 2px solid var(--pt-amarelo); outline-offset: 1px; }

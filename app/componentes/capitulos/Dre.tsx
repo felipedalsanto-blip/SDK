@@ -1,7 +1,7 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { Trilha } from "@/lib/capitulos"
-import { acharLinha, montarDre } from "@/lib/demonstrativos"
+import { acharLinha, montarDre, type Linha, type PremissasIr } from "@/lib/demonstrativos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtPct, useBusca } from "../util"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Demonstrativo, Diferenca, Indicador, LinhasAno, Premissa } from "./ui"
@@ -11,22 +11,94 @@ export function useTrilha(calculoId: string, regime: string) {
 }
 
 /** Os valores de uma linha do demonstrativo em cada cenário: [AR, ...anos]. */
-export function porCenario(t: Trilha, montar: typeof montarDre, id: string) {
+export function porCenario(t: Trilha, montar: (t: Trilha, cenarioId: string) => Linha[], id: string) {
   return t.cenarios.map((c) => ({ c, valores: acharLinha(montar(t, c.id), id)?.valores ?? [] }))
 }
 
-export function Dre({ calculoId, regime }: { calculoId: string; regime: string }) {
+type Entrada = Omit<PremissasIr, "regime" | "meses">
+const PADRAO: Entrada = { despesas: { modo: "percentual", valor: 0 }, atividade: "comercio" }
+
+/** As premissas de IR e CSLL do cálculo, guardadas neste navegador e usadas na DRE e no fluxo. */
+export function usePremissasIr(calculoId: string, regime: string, meses: number | null): [PremissasIr, (e: Entrada) => void] {
+  const chave = `pricetax-premissas-ir:${calculoId}`
+  const [entrada, setEntrada] = useState<Entrada>(PADRAO)
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem(chave)
+      if (salvo) setEntrada({ ...PADRAO, ...JSON.parse(salvo) })
+    } catch {}
+  }, [chave])
+  const mudar = (e: Entrada) => {
+    setEntrada(e)
+    try {
+      localStorage.setItem(chave, JSON.stringify(e))
+    } catch {}
+  }
+  return [{ ...entrada, regime, meses: meses && meses > 0 ? meses : 12 }, mudar]
+}
+
+const NOME_REGIME: Record<string, string> = { simplesNacional: "Simples Nacional", lucroReal: "Lucro Real", lucroPresumido: "Lucro Presumido" }
+
+export function FormPremissas({ p, mudar }: { p: PremissasIr; mudar: (e: Entrada) => void }) {
+  const simples = p.regime === "simplesNacional"
+  return (
+    <div className="cap-premissas-ir">
+      <span className="cap-kpi-rotulo">Premissas para o IRPJ e a CSLL · {NOME_REGIME[p.regime] ?? p.regime}</span>
+      {simples ? (
+        <span className="cap-sub">No Simples Nacional, IRPJ e CSLL estão dentro do DAS e não são calculados à parte.</span>
+      ) : (
+        <div className="cap-premissas-campos">
+          <label>
+            Despesas operacionais
+            <span className="cap-premissas-linha">
+              <input
+                type="number"
+                min={0}
+                step={p.despesas.modo === "percentual" ? 0.5 : 1000}
+                value={p.despesas.valor}
+                onChange={(e) => mudar({ despesas: { ...p.despesas, valor: Math.max(0, Number(e.target.value) || 0) }, atividade: p.atividade })}
+              />
+              <select value={p.despesas.modo} onChange={(e) => mudar({ despesas: { modo: e.target.value as "percentual" | "valor", valor: p.despesas.valor }, atividade: p.atividade })}>
+                <option value="percentual">% da receita líquida</option>
+                <option value="valor">R$ no período</option>
+              </select>
+            </span>
+          </label>
+          {p.regime === "lucroPresumido" && (
+            <label>
+              Atividade (presunção)
+              <select value={p.atividade} onChange={(e) => mudar({ despesas: p.despesas, atividade: e.target.value as "comercio" | "servicos" })}>
+                <option value="comercio">Comércio e indústria (8% IRPJ, 12% CSLL)</option>
+                <option value="servicos">Serviços (32% IRPJ, 32% CSLL)</option>
+              </select>
+            </label>
+          )}
+          <span className="cap-sub">
+            {p.regime === "lucroPresumido"
+              ? "IRPJ de 15% e CSLL de 9% sobre a base presumida da receita bruta, mais 10% de adicional de IRPJ acima de R$ 20 mil por mês."
+              : "IRPJ de 15% e CSLL de 9% sobre o lucro antes do IR e da CSLL, mais 10% de adicional de IRPJ acima de R$ 20 mil por mês."}{" "}
+            Período de {p.meses} meses. As despesas não vêm da API: informe as do cliente.
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function Dre({ calculoId, regime, periodoMeses }: { calculoId: string; regime: string; periodoMeses: number | null }) {
   const { dados, erro, carregando } = useTrilha(calculoId, regime)
   const [cenario, setCenario] = useState<string | null>(null)
+  const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
   if (erro) return <Erro erro={erro} />
   if (!dados) return <div className="cartao vazio">Montando a DRE de 2027 a 2033 nos três cenários…</div>
 
   const anos = dados.anos
   const escolhido = dados.cenarios.find((c) => c.id === cenario) ?? dados.cenarios.find((c) => c.rotulo === "Com Reajuste") ?? dados.cenarios[0]
-  const linhas = montarDre(dados, escolhido.id)
+  const montar = (t: Trilha, c: string) => montarDre(t, c, premissas)
+  const linhas = montar(dados, escolhido.id)
   const v = (id: string) => acharLinha(linhas, id)?.valores ?? []
   const series = (id: string) =>
-    porCenario(dados, montarDre, id).map(({ c, valores }) => ({ nome: c.rotulo, cor: COR_CENARIO[c.rotulo], valores: valores.slice(1) }))
+    porCenario(dados, montar, id).map(({ c, valores }) => ({ nome: c.rotulo, cor: COR_CENARIO[c.rotulo], valores: valores.slice(1) }))
   const ar = (id: string) => v(id)[0] ?? null
 
   // Receita bruta de hoje − a do primeiro ano = tributos atuais que saem + mudança no preço líquido.
@@ -69,6 +141,7 @@ export function Dre({ calculoId, regime }: { calculoId: string; regime: string }
           titulo="DRE"
           leitura="No formato da DRE: clique numa linha com ▸ para abrir até o tributo (deduções por tributo, créditos por tributo). Valores negativos são saídas."
         >
+          <FormPremissas p={premissas} mudar={mudarPremissas} />
           <Alternar opcoes={Object.fromEntries(dados.cenarios.map((c) => [c.id, c.rotulo]))} valor={escolhido.id} onChange={(x) => setCenario(x)} />
           <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} />
           <p className="cap-nota">
@@ -93,6 +166,15 @@ export function Dre({ calculoId, regime }: { calculoId: string; regime: string }
           <LinhasAno anos={anos} ar={ar("lb")} series={series("lb")} />
         </Bloco>
 
+        {regime !== "simplesNacional" && (
+          <Bloco
+            titulo="Lucro líquido no tempo"
+            leitura="Depois das despesas informadas, do IRPJ e da CSLL. A linha tracejada é o resultado de hoje."
+          >
+            <LinhasAno anos={anos} ar={ar("ll")} series={series("ll")} />
+          </Bloco>
+        )}
+
         <div className="grade-2">
           <Bloco titulo="Margem bruta" leitura="Lucro bruto sobre a receita líquida.">
             <LinhasAno anos={anos} ar={ar("mb")} series={series("mb")} formatar={(x) => fmtPct(x)} />
@@ -103,7 +185,8 @@ export function Dre({ calculoId, regime }: { calculoId: string; regime: string }
         </div>
 
         <Premissa>
-          A DRE vai até o lucro bruto: a API de cálculos não traz despesas operacionais, IR e CSLL. Custos = compras do período (custos e despesas
+          Despesas operacionais são informadas por você (a API de cálculos não as traz); o IRPJ e a CSLL são calculados a partir delas, pelas
+          alíquotas gerais do regime. Custos = compras do período (custos e despesas
           adquiridos), sem IBS e CBS no DR. Compras no cenário Ajustado em todos os cenários de venda.
         </Premissa>
       </Capitulo>

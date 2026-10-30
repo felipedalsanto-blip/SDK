@@ -2,7 +2,7 @@ import "server-only"
 import type { CalculoDetalhe, EntradaConsulta, Metrica, Recorte } from "@pricetax/sdk"
 import { numeroCsv, registrosCsv } from "./csv"
 import { emCache, pricetax } from "./pricetax"
-import { METRICAS_DEBITO, METRICAS_DETALHE } from "./tributos"
+import { METRICAS_DEBITO, METRICAS_DETALHE, TRIBUTOS } from "./tributos"
 
 /*
  * Os quatro capítulos do Diagnóstico da Reforma (Compras, Vendas, DRE e Fluxo de Caixa),
@@ -296,6 +296,8 @@ export type Vendas = {
   itens: { aumento: Item[]; reducao: Item[] }
   simples: { aumento: Parceiro[]; reducao: Parceiro[] }
   desvios: Desvio[]
+  /** Valor das vendas e tributo de cada item (AR e DR), base do custo do cliente por perfil. */
+  custoCliente: Record<string, number>
   pareto: { precoSobeCliente: Pareto; precoSobeNcm: Pareto; precoSobeGrupo: Pareto; precoCaiCliente: Pareto; precoCaiNcm: Pareto }
   parcial: boolean
 }
@@ -357,6 +359,14 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
 
   const recorte = recorteDe(cenario.id)
   const base = { recorte, sentido: "saida" as const }
+
+  // Custo do cliente: o valor das vendas e cada tributo da nota, para aplicar os créditos de cada perfil.
+  const metricasCliente = ["valor_ar", "valor_dr", ...TRIBUTOS.flatMap((t) => [`valor_${t.id}_ar`, `valor_${t.id}_dr`])] as Metrica[]
+  const custoCliente = await emCache(`cap-custo-cliente:${id}:${JSON.stringify(recorte)}`, 900, async () => {
+    const { grupos } = await pricetax().calculos.consultar(id, { ...base, metricas: metricasCliente })
+    const g = grupos[0] ?? {}
+    return Object.fromEntries(metricasCliente.map((m) => [m, n(g[m])])) as Record<string, number>
+  })
   const cli = await consultarTudo(id, {
     ...base,
     agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
@@ -428,6 +438,7 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
     itens: { aumento: comNome(listas.itens.aumento), reducao: comNome(listas.itens.reducao) },
     simples: { aumento: comNome(listas.simples.aumento), reducao: comNome(listas.simples.reducao) },
     desvios: desvios.slice(0, 15),
+    custoCliente,
     pareto: {
       precoSobeCliente: pareto(clientes.map((p) => ({ chave: String(p.cnpj), rotulo: rotuloCli(p), valor: difPreco(p) }))),
       precoSobeNcm: pareto(ncmLista.map((x) => ({ chave: String(x.ncm), rotulo: x.ncm ?? "Sem NCM", valor: difPreco(x) }))),

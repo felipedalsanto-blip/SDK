@@ -3,6 +3,7 @@ import { useState } from "react"
 import type { Vendas as Dados } from "@/lib/capitulos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
+import { CustoCliente } from "./CustoCliente"
 import { Explorador } from "./Explorador"
 import { ProvedorFicha } from "./Ficha"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Diferenca, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
@@ -111,6 +112,15 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
             <p className="cap-nota">
               * Estimado: para cliente do regime regular, preço menos o IBS e a CBS que ele credita; para o Simples Nacional, o próprio preço.
             </p>
+          </Bloco>
+        )}
+
+        {atual && (
+          <Bloco
+            titulo={`Custo do seu cliente · ${atual.rotulo}`}
+            leitura="Quanto o cliente efetivamente paga, conforme o regime dele e os créditos que consegue aproveitar: não só o IBS e a CBS, mas também o ICMS da transição e o IPI e o PIS/COFINS de hoje, quando ele tem direito. Clique num perfil para ver o detalhamento e use a régua para dizer quanto da sua carteira é de cada perfil."
+          >
+            <CustoCliente base={dados.custoCliente} porRegime={atual.porRegime} ano={dados.ano} calculoId={calculoId} />
           </Bloco>
         )}
 

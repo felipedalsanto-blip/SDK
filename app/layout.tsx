@@ -8,7 +8,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        {/* Aplica o tema escolhido antes da primeira pintura, para não piscar. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("pricetax-tema");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   )

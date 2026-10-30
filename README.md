@@ -85,3 +85,9 @@ npm run cclasstrib:atualizar
 
 A análise de um ano faz de 3 a 14 consultas (as razões sociais dos 10 fornecedores críticos são lidas
 uma a uma) e a projeção, uma por ano. Tudo fica em cache no servidor por 10 minutos.
+
+## Tema, custo do cliente e IRPJ/CSLL
+
+- **Tema**: seletor Claro / Escuro / Sistema no topo; a escolha fica salva no navegador (`pricetax-tema`).
+- **Vendas · Custo do seu cliente**: nove perfis de comprador (Simples padrão e híbrido; Lucro Real e Presumido em indústria, comércio e serviços; pessoa física), com os créditos que cada um aproveita hoje e em 2027, detalhe por perfil e régua de % da carteira (começa pela carteira real por regime).
+- **DRE e fluxo de caixa**: despesas operacionais informadas pelo usuário (% da receita líquida ou R$), LAIR, IRPJ (15% + adicional de 10%), CSLL (9%), lucro líquido e caixa depois do IR. No Presumido, presunção de 8%/12% (comércio e indústria) ou 32% (serviços). No Simples, IR e CSLL ficam dentro do DAS.

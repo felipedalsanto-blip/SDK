@@ -21,6 +21,38 @@ import { Erro, rotuloValor } from "./comum"
 
 type Total = Record<string, number | string | boolean | null>
 
+type Modo = "light" | "dark" | "sistema"
+
+/** Claro, escuro ou o do sistema; a escolha fica salva neste navegador. */
+function Tema() {
+  const [modo, setModo] = useState<Modo>("sistema")
+  useEffect(() => {
+    try {
+      const t = localStorage.getItem("pricetax-tema")
+      if (t === "light" || t === "dark") setModo(t)
+    } catch {}
+  }, [])
+  const mudar = (m: Modo) => {
+    setModo(m)
+    if (m === "sistema") delete document.documentElement.dataset.theme
+    else document.documentElement.dataset.theme = m
+    try {
+      if (m === "sistema") localStorage.removeItem("pricetax-tema")
+      else localStorage.setItem("pricetax-tema", m)
+    } catch {}
+  }
+  const opcoes: [Modo, string][] = [["light", "☀ Claro"], ["dark", "☾ Escuro"], ["sistema", "Sistema"]]
+  return (
+    <div className="tema" role="group" aria-label="Tema">
+      {opcoes.map(([m, nome]) => (
+        <button key={m} aria-pressed={modo === m} onClick={() => mudar(m)}>
+          {nome}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
   const [calculoId, setCalculoId] = useState<string | null>(null)
 
@@ -51,6 +83,8 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
           <img src="/logo-pricetax.png" alt="PriceTax" className="logo" />
           <span>Diagnóstico da Reforma Tributária</span>
         </div>
+        <div className="topo-acoes">
+        <Tema />
         {calculoId && lista.dados && (
           <div className="campo" style={{ minWidth: 0 }}>
             <select
@@ -69,6 +103,7 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
             </select>
           </div>
         )}
+        </div>
       </header>
       <main>
         {!calculoId && <EscolherCalculo lista={lista} onEscolher={escolher} />}
@@ -265,9 +300,9 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
       ) : aba === "vendas" ? (
         <Vendas calculoId={calculo.id} regime={regime} />
       ) : aba === "dre" ? (
-        <Dre calculoId={calculo.id} regime={regime} />
+        <Dre calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} />
       ) : aba === "fluxo" ? (
-        <Fluxo calculoId={calculo.id} regime={regime} />
+        <Fluxo calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} />
       ) : aba === "geral" ? (
         <>
           <Resumo calculoId={calculo.id} selecao={selecao} chave={chave} />

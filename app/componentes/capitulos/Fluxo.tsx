@@ -4,11 +4,13 @@ import type { Estorno } from "@/lib/capitulos"
 import { acharLinha, montarFluxo } from "@/lib/demonstrativos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtPct, useBusca } from "../util"
-import { porCenario, useTrilha } from "./Dre"
+import type { Trilha } from "@/lib/capitulos"
+import { FormPremissas, porCenario, usePremissasIr, useTrilha } from "./Dre"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Demonstrativo, Indicador, LinhasAno, Premissa } from "./ui"
 
-export function Fluxo({ calculoId, regime }: { calculoId: string; regime: string }) {
+export function Fluxo({ calculoId, regime, periodoMeses }: { calculoId: string; regime: string; periodoMeses: number | null }) {
   const { dados, erro, carregando } = useTrilha(calculoId, regime)
+  const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
   const estorno = useBusca((s) => api<Estorno>(`/api/calculos/${calculoId}/capitulos/estorno`, { regime }, s), [calculoId, regime])
   const [cenario, setCenario] = useState<string | null>(null)
 
@@ -17,10 +19,11 @@ export function Fluxo({ calculoId, regime }: { calculoId: string; regime: string
 
   const anos = dados.anos
   const escolhido = dados.cenarios.find((c) => c.id === cenario) ?? dados.cenarios.find((c) => c.rotulo === "Com Reajuste") ?? dados.cenarios[0]
-  const linhas = montarFluxo(dados, escolhido.id)
+  const montar = (t: Trilha, c: string) => montarFluxo(t, c, premissas)
+  const linhas = montar(dados, escolhido.id)
   const v = (id: string) => acharLinha(linhas, id)?.valores ?? []
   const series = (id: string, sinal = 1) =>
-    porCenario(dados, montarFluxo, id).map(({ c, valores }) => ({
+    porCenario(dados, montar, id).map(({ c, valores }) => ({
       nome: c.rotulo,
       cor: COR_CENARIO[c.rotulo],
       valores: valores.slice(1).map((x) => (x === null ? null : sinal * x)),
@@ -34,6 +37,7 @@ export function Fluxo({ calculoId, regime }: { calculoId: string; regime: string
           titulo="Fluxo de caixa operacional"
           leitura="No formato que o financeiro usa: entradas positivas, saídas negativas. Clique numa linha com ▸ para abrir até o tributo."
         >
+          <FormPremissas p={premissas} mudar={mudarPremissas} />
           <Alternar opcoes={Object.fromEntries(dados.cenarios.map((c) => [c.id, c.rotulo]))} valor={escolhido.id} onChange={(x) => setCenario(x)} />
           <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} />
         </Bloco>
@@ -62,6 +66,12 @@ export function Fluxo({ calculoId, regime }: { calculoId: string; regime: string
           <LinhasAno anos={anos} ar={ar("ger")} series={series("ger")} />
         </Bloco>
 
+        {regime !== "simplesNacional" && (
+          <Bloco titulo="Geração de caixa depois do IR e da CSLL" leitura="O mesmo caixa, descontados o IRPJ e a CSLL calculados na DRE com as premissas informadas.">
+            <LinhasAno anos={anos} ar={ar("ger-ir")} series={series("ger-ir")} />
+          </Bloco>
+        )}
+
         <Bloco
           titulo="Estorno de débito: o benefício na saída que se perde"
           leitura="Hoje a empresa destaca um tributo na nota e deve menos por causa de benefícios na saída (por exemplo, destaca 12% e estorna 10%, ficando com 2%). Com os tributos atuais sendo extintos, esse ganho perde força a cada ano."
@@ -88,7 +98,7 @@ export function Fluxo({ calculoId, regime }: { calculoId: string; regime: string
 
         <Premissa>
           Fonte: cálculo da Pricetax, compras no Ajustado. Recebimento = vendas com tributos; pagamento a fornecedores = compras com tributos; tributos
-          recolhidos = débitos das vendas menos créditos das compras. Não inclui IR e CSLL.
+          recolhidos = débitos das vendas menos créditos das compras. IRPJ e CSLL vêm da DRE, com as premissas informadas.
         </Premissa>
       </Capitulo>
     </div>
