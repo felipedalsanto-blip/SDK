@@ -94,12 +94,12 @@ const brlCompacto = new Intl.NumberFormat("pt-BR", { style: "currency", currency
 const inteiro = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 })
 const pct = new Intl.NumberFormat("pt-BR", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 2 })
 
-// `null` é "sem dado", não zero: aparece como travessão.
-export const fmtBRL = (v: Valor) => (num(v) === null ? "—" : brl.format(num(v)!))
-export const fmtBRLCurto = (v: Valor) => (num(v) === null ? "—" : brlCompacto.format(num(v)!))
-export const fmtInt = (v: Valor) => (num(v) === null ? "—" : inteiro.format(num(v)!))
+// `null` é "sem dado", não zero: aparece como "n/d".
+export const fmtBRL = (v: Valor) => (num(v) === null ? "n/d" : brl.format(num(v)!))
+export const fmtBRLCurto = (v: Valor) => (num(v) === null ? "n/d" : brlCompacto.format(num(v)!))
+export const fmtInt = (v: Valor) => (num(v) === null ? "n/d" : inteiro.format(num(v)!))
 /** Alíquotas e cargas vêm em fração (0.27 = 27%). */
-export const fmtPct = (v: Valor) => (num(v) === null ? "—" : pct.format(num(v)!))
+export const fmtPct = (v: Valor) => (num(v) === null ? "n/d" : pct.format(num(v)!))
 
 /** Variação relativa de antes para depois, ou null quando não dá para calcular. */
 export function variacao(antes: Valor, depois: Valor): number | null {
@@ -117,15 +117,30 @@ export function pontos(antes: Valor, depois: Valor): number | null {
 }
 
 export function fmtData(v: Valor) {
-  if (typeof v !== "string" || !v) return "—"
+  if (typeof v !== "string" || !v) return "n/d"
   const [a, m, d] = v.slice(0, 10).split("-")
   return d && m && a ? `${d}/${m}/${a}` : v
 }
 
 export function fmtCnpj(v: Valor) {
-  if (typeof v !== "string") return "—"
+  if (typeof v !== "string") return "n/d"
   const s = v.replace(/\D/g, "")
   return s.length === 14 ? s.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") : v
 }
 
 export { num }
+
+/** Variação relativa formatada com sinal ("+12,3%"), ou null quando não dá para calcular. */
+export function fmtVariacao(antes: Valor, depois: Valor): string | null {
+  const v = variacao(antes, depois)
+  if (v === null) return null
+  return `${v > 0 ? "+" : ""}${fmtPct(v)}`
+}
+
+/** "jan/2024" a partir de "2024-01" ou "2024-01-15". */
+export function fmtMes(v: string | null) {
+  if (!v) return null
+  const [a, m] = v.split("-")
+  const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+  return m && a ? `${nomes[Number(m) - 1] ?? m}/${a}` : v
+}

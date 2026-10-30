@@ -8,7 +8,6 @@ import type {
   FornecedorCritico,
   ItemCritico,
   ParDivergente,
-  PontoProjecao,
   ResumoClassificacao,
   Situacao,
 } from "./classificacao"
@@ -169,6 +168,7 @@ function agregar<T extends { itens: number; valor: number; perda: number; ganho:
   cheias: Record<Tributo, number | null>,
   chave: (g: Grupo) => string,
   novo: (g: Grupo) => Omit<T, "itens" | "valor" | "perda" | "ganho" | "pares">,
+  ordem: "perda" | "ganho" = "perda",
 ): T[] {
   const mapa = new Map<string, T>()
   for (const g of grupos) {
@@ -185,11 +185,18 @@ function agregar<T extends { itens: number; valor: number; perda: number; ganho:
     if (!atual.pares.includes(rotuloPar(g))) atual.pares.push(rotuloPar(g))
     mapa.set(k, atual)
   }
-  return [...mapa.values()].sort((a, b) => b.perda - a.perda || b.ganho - a.ganho || b.valor - a.valor)
+  const outra = ordem === "perda" ? "ganho" : "perda"
+  return [...mapa.values()]
+    .filter((x) => x[ordem] > 0)
+    .sort((a, b) => b[ordem] - a[ordem] || b[outra] - a[outra] || b.valor - a.valor)
 }
 
 /** Análise completa de um recorte (um ano): resumo, matriz CST, pares, itens e fornecedores. */
-export async function analisarClassificacao(id: string, base: Base): Promise<AnaliseClassificacao> {
+export async function analisarClassificacao(
+  id: string,
+  base: Base,
+  ordem: "perda" | "ganho" = "perda",
+): Promise<AnaliseClassificacao> {
   const api = pricetax().calculos
   const pares = await consultarPares(id, base)
   const { resumo, pares: divergentes, cheias, notasDivergentes } = analisarPares(pares.grupos, base.sentido)
@@ -235,6 +242,7 @@ export async function analisarClassificacao(id: string, base: Base): Promise<Ana
       cheias,
       (g) => `${sentidoDe(g, base.sentido)}|${texto(g.descricao_produto)}`,
       (g) => ({ sentido: sentidoDe(g, base.sentido), descricao: texto(g.descricao_produto) }),
+      ordem,
     ).slice(0, 15)
 
     if (fornecedores) {
@@ -256,6 +264,7 @@ export async function analisarClassificacao(id: string, base: Base): Promise<Ana
         cheias,
         (g) => String(texto(g.cnpj_outra_parte)),
         (g) => ({ cnpj: texto(g.cnpj_outra_parte), razaoSocial: null }),
+        ordem,
       ).slice(0, 10)
       // A razão social não é dimensão: lê uma linha de cada fornecedor do ranking (até 10 chamadas, em cache).
       for (const f of fornecedores) {
@@ -290,15 +299,21 @@ export async function analisarClassificacao(id: string, base: Base): Promise<Ana
   }
 }
 
-/** Perda e ganho estimados em cada ano da transição, com o fator para anualizar. */
-export async function projetarClassificacao(id: string, base: Base, anos: number[], periodoMeses: number | null) {
-  const fatorAnual = periodoMeses && periodoMeses > 0 ? 12 / periodoMeses : null
-  const pontos: PontoProjecao[] = []
-  // Em sequência, não em paralelo: até 9 consultas, dentro do limite de 60/min (e em cache).
-  for (const ano of [...anos].sort((a, b) => a - b)) {
-    const { grupos } = await consultarPares(id, { ...base, recorte: { ...base.recorte, ano } })
-    const { resumo } = analisarPares(grupos, base.sentido)
-    pontos.push({ ano, perda: resumo.perda, ganho: resumo.ganho, fatorAnual })
+/** Perda e ganho das divergências de cClassTrib num ano, separados por compras e vendas. */
+export async function impactoClassificacao(id: string, base: Base) {
+  const { grupos } = await consultarPares(id, base)
+  const { pares, resumo } = analisarPares(grupos, base.sentido)
+  const r = { ganhoEntrada: 0, ganhoSaida: 0, perdaEntrada: 0, perdaSaida: 0, naoEstimado: resumo.naoEstimado }
+  for (const p of pares) {
+    if (!p.estimativa) continue
+    const i = p.estimativa.impacto
+    if (p.sentido === "entrada") {
+      r.ganhoEntrada += Math.max(0, i)
+      r.perdaEntrada += Math.max(0, -i)
+    } else {
+      r.ganhoSaida += Math.max(0, i)
+      r.perdaSaida += Math.max(0, -i)
+    }
   }
-  return pontos
+  return r
 }

@@ -1,15 +1,26 @@
-# Painel de cálculos PriceTax
+# Painel da Reforma Tributária (Pricetax)
 
-Interface web (Next.js) para visualizar os cálculos da PriceTax antes e depois da reforma
-tributária, usando o [`@pricetax/sdk`](https://developers-rho-seven.vercel.app/calculos/sdk/).
+Visão executiva dos efeitos da Reforma Tributária na empresa, feita para o contador apresentar ao
+cliente, a partir dos cálculos da Pricetax via [`@pricetax/sdk`](https://developers-rho-seven.vercel.app/calculos/sdk/).
+Padrão visual Vitória (Montserrat, amarelo `#FFD700`, preto `#1A1A1A`, cinza `#6B6B6B`), com modo
+claro e escuro.
 
-- **Totais do recorte**: tributos, carga efetiva, valor, débito e crédito, antes × depois.
-- **Ano a ano da transição** (2026–2033): carga efetiva ou tributos em R$. Clique num ano para abrir o recorte.
-- **Ranking** por NCM, CFOP, CNPJ, UF, tipo de item, operação, segmento ou produto. Clique num grupo para filtrar o painel inteiro.
-- **Itens de nota** paginados e **download do CSV** do recorte (formato das planilhas do app).
-- **Classificação CST / cClassTrib** (aba própria): CST e cClassTrib da nota × calculados, divergências,
-  perda e ganho potenciais estimados (o correto é o calculado), itens e fornecedores críticos e
-  projeção ano a ano de 2026 a 2033, por período do cálculo ou anualizada.
+**Aba Reforma na empresa:** o caso em uma leitura, os quatro números da reforma (Hoje × ano de
+transição × regime pleno), a curva dos tributos a recolher de 2026 a 2033, compras e insumos, vendas
+e preço, comparação de regimes (com os regimes vedados pela receita), sensibilidade ao pior cenário
+de compras e plano de ação.
+
+**Aba Auditoria de IBS e CBS:** o indicador **DJF, Dinheiro Jogado Fora**, do macro ao micro:
+
+1. fornecedor repassando o tributo sobre o valor cheio (Sem Reajuste × Ajustado, nas compras), até os itens de cada fornecedor;
+2. preço de venda sem reajuste (Ajustado × Sem Reajuste, nas vendas), até os clientes de cada item;
+3. crédito de IBS e CBS deixado na mesa (cClassTrib da nota de compra × calculado);
+4. IBS e CBS destacado a mais nas vendas (cClassTrib da nota de venda × calculado).
+
+O risco fiscal (tributo a menor, crédito a maior) aparece à parte: é passivo, não DJF.
+
+Todo cenário traz a **raiz da informação** (cálculo, competências e meses) e a **data de geração do
+relatório**. A visão não traz DRE nem fluxo de caixa: a API de cálculos não informa despesas, IR e CSLL.
 
 ## Configurar
 
@@ -49,7 +60,7 @@ tributária, usando o [`@pricetax/sdk`](https://developers-rho-seven.vercel.app/
 do painel vê todos os cálculos dela. Ao publicar, defina `PAINEL_USUARIO` e `PAINEL_SENHA`
 (HTTP Basic, em `middleware.ts`) ou ponha o painel atrás da autenticação que vocês já usam.
 
-## Classificação CST / cClassTrib
+## Classificação CST / cClassTrib (ramos 3 e 4 do DJF)
 
 `lib/divergencias.ts` compara `cclass_nota` com `cclass_calculado` em cada item e estima o IBS + CBS
 que a classificação da nota geraria, usando a redução de cada código na tabela oficial
