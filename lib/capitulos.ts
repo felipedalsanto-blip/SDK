@@ -552,3 +552,140 @@ export async function montarEstorno(calculo: CalculoDetalhe, regime: Recorte["re
   return { cenario: cenario?.nome ?? "Sem Reajuste", ar: ar!, anos: pontos }
 }
 
+
+/* ───────────────────────────── FICHAS (fornecedor/cliente ↔ item) ───────────────────────────── */
+
+/** Soma de um recorte filtrado, com tudo que a memória de cálculo AR × DR precisa. */
+export type Memoria = Record<string, number>
+
+export type Nota = {
+  data: string | null
+  cnpj: string | null
+  nome: string | null
+  quantidade: number
+  valorAr: number
+  valorDr: number
+  custoAr: number
+  custoDr: number
+  cfop: string | null
+}
+
+export type Ficha = {
+  tipo: "parceiro" | "item"
+  sentido: "entrada" | "saida"
+  ano: number
+  cenario: string
+  titulo: string
+  sub: string | null
+  regime: string | null
+  memoria: Memoria
+  /** Na ficha do parceiro: os itens dele. Na do item: os parceiros que têm o item. */
+  itens: Item[]
+  parceiros: Parceiro[]
+  notas: Nota[]
+  parcial: boolean
+}
+
+const TRIB = ["icms", "icms_st", "icms_difal", "iss", "ipi", "pis_cofins", "ibs", "cbs"]
+const METRICAS_MEMORIA_BASE = [
+  "itens",
+  "quantidade",
+  "valor_ar",
+  "valor_dr",
+  "valor_desonerado_ar",
+  "valor_desonerado_dr",
+  "valor_sem_iva_dr",
+  "valor_impostos_ar",
+  "valor_impostos_dr",
+  "carga_efetiva_ar",
+  "carga_efetiva_dr",
+  ...TRIB.flatMap((t) => [`valor_${t}_ar`, `valor_${t}_dr`, `aliq_${t}_ar`, `aliq_${t}_dr`]),
+] as Metrica[]
+const METRICAS_MEMORIA: Record<"entrada" | "saida", Metrica[]> = {
+  entrada: [...METRICAS_MEMORIA_BASE, "credito_ar", "credito_dr", "custo_ar", "custo_dr", ...(TRIB.flatMap((t) => [`credito_${t}_ar`, `credito_${t}_dr`]) as Metrica[])],
+  saida: [...METRICAS_MEMORIA_BASE, "debito_ar", "debito_dr", ...(TRIB.flatMap((t) => [`debito_${t}_ar`, `debito_${t}_dr`]) as Metrica[])],
+}
+
+export async function montarFicha(
+  calculo: CalculoDetalhe,
+  regime: Recorte["regime"],
+  sentido: "entrada" | "saida",
+  cenarioId: string,
+  tipo: "parceiro" | "item",
+  valor: string,
+): Promise<Ficha> {
+  const id = calculo.id
+  const ano = anoAcao(calculo)
+  const cenario = sentido === "saida" && calculo.cenarios.some((c) => c.id === cenarioId) ? cenarioId : "base"
+  const recorte: Recorte = { regime, ano, cenario_vendas: cenario, cenario_compras: "base" }
+  const filtros: Record<string, (string | number | null)[]> = { [tipo === "parceiro" ? "cnpj_outra_parte" : "descricao_produto"]: [valor] }
+  const base = { recorte, sentido, filtros }
+
+  // A memória de cálculo: uma soma única do recorte filtrado (com alíquotas efetivas ponderadas).
+  const memoria = await emCache(`ficha-mem:${id}:${JSON.stringify(base)}`, 600, async () => {
+    const { grupos } = await pricetax().calculos.consultar(id, { ...base, metricas: METRICAS_MEMORIA[sentido] })
+    const g = grupos[0] ?? {}
+    return Object.fromEntries(METRICAS_MEMORIA[sentido].map((m) => [m, n(g[m])])) as Memoria
+  })
+
+  // O outro lado: itens do parceiro, ou parceiros do item.
+  const lista = await consultarTudo(id, {
+    ...base,
+    agrupar_por: tipo === "parceiro" ? ["descricao_produto", "ncm"] : ["cnpj_outra_parte", "regime_outra_parte"],
+    metricas: METRICAS_LISTA,
+    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
+  })
+
+  // As primeiras notas, para rastrear a origem dos números.
+  const pagina = await emCache(`ficha-notas:${id}:${JSON.stringify(base)}`, 600, () => pricetax().calculos.pagina(id, { ...base, limite: 25 }))
+  const notas: Nota[] = pagina.linhas.map((l) => {
+    const r = l as Record<string, unknown>
+    return {
+      data: texto(r.data_operacao),
+      cnpj: texto(r.cnpj_outra_parte),
+      nome: texto(r.razao_social_outra_parte),
+      quantidade: n(r.quantidade),
+      valorAr: n(r.valor_ar),
+      valorDr: n(r.valor_dr),
+      custoAr: n(r.custo_ar),
+      custoDr: n(r.custo_dr),
+      cfop: texto(r.cfop),
+    }
+  })
+
+  const primeira = pagina.linhas[0] as Record<string, unknown> | undefined
+  if (tipo === "parceiro") {
+    const itens: Item[] = lista.grupos.map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: valor, nome: null }))
+    const nome = texto(primeira?.razao_social_outra_parte)
+    return {
+      tipo,
+      sentido,
+      ano,
+      cenario: calculo.cenarios.find((c) => c.id === cenario)?.nome ?? cenario,
+      titulo: nome ?? valor,
+      sub: valor,
+      regime: texto(primeira?.regime_outra_parte),
+      memoria,
+      itens: itens.map((i) => ({ ...i, nome })),
+      parceiros: [],
+      notas,
+      parcial: lista.parcial,
+    }
+  }
+  const parceiros: Parceiro[] = lista.grupos.map((g) => ({ ...valores(g), cnpj: texto(g.cnpj_outra_parte), nome: null, regime: texto(g.regime_outra_parte) }))
+  const nomes = await nomesPorCnpj(id, recorte, sentido, parceiros.slice(0, 100).map((p) => p.cnpj ?? ""))
+  return {
+    tipo,
+    sentido,
+    ano,
+    cenario: calculo.cenarios.find((c) => c.id === cenario)?.nome ?? cenario,
+    titulo: valor,
+    sub: texto(primeira?.ncm) ? `NCM ${texto(primeira?.ncm)}` : null,
+    regime: null,
+    memoria,
+    itens: [],
+    parceiros: parceiros.map((p) => ({ ...p, nome: (p.cnpj && nomes.get(p.cnpj)) || null })),
+    notas,
+    parcial: lista.parcial,
+  }
+}

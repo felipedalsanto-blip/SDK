@@ -4,6 +4,7 @@ import type { Compras as Dados } from "@/lib/capitulos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { Explorador } from "./Explorador"
+import { ProvedorFicha } from "./Ficha"
 import { Alternar, Bloco, Capitulo, Diferenca, Indicador, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
 
 type Sentido = "aumento" | "reducao"
@@ -24,6 +25,7 @@ export function Compras({ calculoId, regime }: { calculoId: string; regime: stri
   const p = dados.pareto
 
   return (
+    <ProvedorFicha calculoId={calculoId} regime={regime} sentido="entrada">
     <div className={carregando ? "carregando" : undefined}>
       <Capitulo
         numero="01"
@@ -131,7 +133,7 @@ export function Compras({ calculoId, regime }: { calculoId: string; regime: stri
               <h4 className="cap-subtitulo">Aumento de custo (negociar)</h4>
               <Pareto
                 dados={pareto === "fornecedor" ? p.custoSobeFornecedor : pareto === "ncm" ? p.custoSobeNcm : p.custoSobeGrupo}
-                medida="o aumento de custo"
+                medida="o aumento de custo" parceiros={pareto === "fornecedor"}
               />
             </div>
             <div>
@@ -139,7 +141,7 @@ export function Compras({ calculoId, regime }: { calculoId: string; regime: stri
               {pareto === "grupo" ? (
                 <p className="cap-vazio">Use “Por fornecedor” ou “Por NCM” para ver as reduções.</p>
               ) : (
-                <Pareto dados={pareto === "fornecedor" ? p.custoCaiFornecedor : p.custoCaiNcm} medida="a redução de custo" />
+                <Pareto dados={pareto === "fornecedor" ? p.custoCaiFornecedor : p.custoCaiNcm} medida="a redução de custo" parceiros={pareto === "fornecedor"} />
               )}
             </div>
           </div>
@@ -209,5 +211,6 @@ export function Compras({ calculoId, regime }: { calculoId: string; regime: stri
         </Premissa>
       </Capitulo>
     </div>
+    </ProvedorFicha>
   )
 }

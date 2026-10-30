@@ -4,7 +4,8 @@ import type { Exploracao } from "@/lib/explorar"
 import { AGRUPADORES, GRUPOS_COLUNAS, type Agrupador } from "@/lib/tributos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtCnpj, fmtInt, fmtPct } from "../util"
-import { Diferenca } from "./ui"
+import { useAbrirFicha } from "./ficha-contexto"
+import { Abrivel, Diferenca } from "./ui"
 
 const REGIMES: Record<string, string> = { simplesNacional: "Simples Nacional", lucroReal: "Lucro Real", lucroPresumido: "Lucro Presumido" }
 const NOME_COLUNA = Object.fromEntries(GRUPOS_COLUNAS.flatMap((g) => g.metricas.map((m) => [m.id, m.nome])))
@@ -29,6 +30,7 @@ export function Explorador({ calculoId, regime, sentido, cenario }: Props) {
   const [erro, setErro] = useState<unknown>(null)
   const [carregando, setCarregando] = useState(false)
   const [painel, setPainel] = useState(false)
+  const abrir = useAbrirFicha()
 
   const ordenacao = colunas.includes(ordenar) ? ordenar : colunas[0]
   const chave = JSON.stringify({ calculoId, regime, sentido, cenario, agrupar, colunas, ordenacao, direcao })
@@ -219,9 +221,15 @@ export function Explorador({ calculoId, regime, sentido, cenario }: Props) {
                     <td key={d} className="texto" title={rotulo(d, g[d])}>
                       {d === "cnpj_outra_parte" && g[d] ? (
                         <>
-                          <b>{rotulo(d, g[d])}</b>
+                          <Abrivel ativo={!!abrir} onAbrir={() => abrir?.({ tipo: "parceiro", valor: String(g[d]), rotulo: rotulo(d, g[d]) })}>
+                            <b>{rotulo(d, g[d])}</b>
+                          </Abrivel>
                           <span className="cap-sub">{fmtCnpj(String(g[d]))}</span>
                         </>
+                      ) : d === "descricao_produto" && g[d] ? (
+                        <Abrivel ativo={!!abrir} onAbrir={() => abrir?.({ tipo: "item", valor: String(g[d]), rotulo: String(g[d]) })}>
+                          {rotulo(d, g[d])}
+                        </Abrivel>
                       ) : (
                         rotulo(d, g[d])
                       )}

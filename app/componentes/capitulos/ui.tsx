@@ -4,6 +4,7 @@ import type { Item, Pareto as DadosPareto, Parceiro } from "@/lib/capitulos"
 import type { Linha } from "@/lib/demonstrativos"
 import { TRIBUTOS } from "@/lib/tributos"
 import { fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, fmtPct, useLargura, variacao } from "../util"
+import { useAbrirFicha } from "./ficha-contexto"
 
 /** Cores fixas: AR (hoje) em cinza; os três cenários de venda em preto, amarelo e cinza médio. */
 export const COR_AR = "var(--pt-cinza)"
@@ -186,6 +187,7 @@ export function TabelaParceiros({
   vazio: string
 }) {
   const [niveis, setNiveis] = useNiveis(grupos)
+  const abrir = useAbrirFicha()
   if (lista.length === 0) return <p className="cap-vazio">{vazio}</p>
   const extras = colunasExtras(niveis, grupos, lista)
   return (
@@ -215,7 +217,9 @@ export function TabelaParceiros({
               <tr key={`${p.cnpj}-${i}`}>
                 <td className="cap-pos">{i + 1}</td>
                 <td className="texto" title={p.nome ?? undefined}>
-                  <b>{p.nome ?? "Sem identificação"}</b>
+                  <Abrivel ativo={!!(abrir && p.cnpj)} onAbrir={() => abrir?.({ tipo: "parceiro", valor: p.cnpj!, rotulo: p.nome ?? fmtCnpj(p.cnpj!) })}>
+                    <b>{p.nome ?? "Sem identificação"}</b>
+                  </Abrivel>
                   <span className="cap-sub">{p.cnpj ? fmtCnpj(p.cnpj) : "sem CNPJ"}</span>
                 </td>
                 <td className="num">{fmtBRL(p.valorAr)}</td>
@@ -255,6 +259,7 @@ export function TabelaItens({
   vazio: string
 }) {
   const [niveis, setNiveis] = useNiveis(grupos)
+  const abrir = useAbrirFicha()
   if (lista.length === 0) return <p className="cap-vazio">{vazio}</p>
   const extras = colunasExtras(niveis, grupos, lista)
   return (
@@ -283,11 +288,15 @@ export function TabelaItens({
               <tr key={i}>
                 <td className="cap-pos">{i + 1}</td>
                 <td className="texto" title={x.descricao ?? undefined}>
-                  <b>{x.descricao ?? "Sem descrição"}</b>
+                  <Abrivel ativo={!!(abrir && x.descricao)} onAbrir={() => abrir?.({ tipo: "item", valor: x.descricao!, rotulo: x.descricao! })}>
+                    <b>{x.descricao ?? "Sem descrição"}</b>
+                  </Abrivel>
                   <span className="cap-sub">NCM {x.ncm ?? "n/d"}</span>
                 </td>
                 <td className="texto" title={x.nome ?? undefined}>
-                  {x.nome ?? (x.cnpj ? fmtCnpj(x.cnpj) : "Sem identificação")}
+                  <Abrivel ativo={!!(abrir && x.cnpj)} onAbrir={() => abrir?.({ tipo: "parceiro", valor: x.cnpj!, rotulo: x.nome ?? fmtCnpj(x.cnpj!) })}>
+                    {x.nome ?? (x.cnpj ? fmtCnpj(x.cnpj) : "Sem identificação")}
+                  </Abrivel>
                 </td>
                 <td className="num">{fmtBRL(x.valorAr)}</td>
                 <td className="num">{fmtBRL(x.valorDr)}</td>
@@ -310,7 +319,8 @@ export function TabelaItens({
 }
 
 /** Pareto em barras: cada grupo, sua parte do total e o acumulado; amarelo até os 80%. */
-export function Pareto({ dados, medida }: { dados: DadosPareto; medida: string }) {
+export function Pareto({ dados, medida, parceiros = false }: { dados: DadosPareto; medida: string; parceiros?: boolean }) {
+  const abrir = useAbrirFicha()
   if (dados.universo === 0) return <p className="cap-vazio">Nenhum caso nesta medida.</p>
   const maior = dados.fatias[0]?.valor ?? 1
   return (
@@ -321,7 +331,9 @@ export function Pareto({ dados, medida }: { dados: DadosPareto; medida: string }
       {dados.fatias.map((f, i) => (
         <div key={`${f.chave}-${i}`} className={`cap-pareto-linha${i < dados.para80 ? " dentro" : ""}`}>
           <span className="cap-pareto-nome" title={f.rotulo}>
-            {f.rotulo}
+            <Abrivel ativo={!!(parceiros && abrir && f.chave !== "null")} onAbrir={() => abrir?.({ tipo: "parceiro", valor: f.chave, rotulo: f.rotulo })}>
+              {f.rotulo}
+            </Abrivel>
           </span>
           <span className="cap-pareto-trilho">
             <span style={{ width: `${(f.valor / maior) * 100}%` }} />
@@ -541,4 +553,14 @@ export function Plano({ titulo, passos }: { titulo: string; passos: { acao: stri
 
 export function Premissa({ children }: { children: React.ReactNode }) {
   return <div className="cap-premissa">{children}</div>
+}
+
+/** Texto que vira botão quando há ficha para abrir (fornecedor, cliente ou item). */
+export function Abrivel({ ativo, onAbrir, children }: { ativo: boolean; onAbrir: () => void; children: React.ReactNode }) {
+  if (!ativo) return <>{children}</>
+  return (
+    <button className="cap-abrir" onClick={onAbrir} title="Abrir a ficha">
+      {children}
+    </button>
+  )
 }

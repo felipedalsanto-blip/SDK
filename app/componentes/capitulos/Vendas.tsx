@@ -4,6 +4,7 @@ import type { Vendas as Dados } from "@/lib/capitulos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { Explorador } from "./Explorador"
+import { ProvedorFicha } from "./Ficha"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Diferenca, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
 
 type Sentido = "aumento" | "reducao"
@@ -35,6 +36,7 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
   const p = dados.pareto
 
   return (
+    <ProvedorFicha calculoId={calculoId} regime={regime} sentido="saida" cenario={dados.cenario.id}>
     <div className={carregando ? "carregando" : undefined}>
       <Capitulo numero="02" titulo={`Vendas · ${dados.ano}`} sub="Três caminhos de preço para 2027 e o que cada um faz com o resultado.">
         <Bloco titulo="Os três cenários de preço" leitura="Escolha um cenário para ver as listas e os padrões logo abaixo.">
@@ -189,14 +191,14 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
           <div className="grade-2" style={{ marginTop: 12 }}>
             <div>
               <h4 className="cap-subtitulo">Aumento de preço</h4>
-              <Pareto dados={pareto === "cliente" ? p.precoSobeCliente : pareto === "ncm" ? p.precoSobeNcm : p.precoSobeGrupo} medida="o aumento de preço" />
+              <Pareto dados={pareto === "cliente" ? p.precoSobeCliente : pareto === "ncm" ? p.precoSobeNcm : p.precoSobeGrupo} medida="o aumento de preço" parceiros={pareto === "cliente"} />
             </div>
             <div>
               <h4 className="cap-subtitulo">Redução de preço</h4>
               {pareto === "grupo" ? (
                 <p className="cap-vazio">Use “Por cliente” ou “Por NCM” para ver as reduções.</p>
               ) : (
-                <Pareto dados={pareto === "cliente" ? p.precoCaiCliente : p.precoCaiNcm} medida="a redução de preço" />
+                <Pareto dados={pareto === "cliente" ? p.precoCaiCliente : p.precoCaiNcm} medida="a redução de preço" parceiros={pareto === "cliente"} />
               )}
             </div>
           </div>
@@ -258,5 +260,6 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
         </Premissa>
       </Capitulo>
     </div>
+    </ProvedorFicha>
   )
 }

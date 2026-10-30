@@ -1,5 +1,5 @@
 import type { Recorte } from "@pricetax/sdk"
-import { montarCompras, montarEstorno, montarTrilha, montarVendas } from "@/lib/capitulos"
+import { montarCompras, montarEstorno, montarFicha, montarTrilha, montarVendas } from "@/lib/capitulos"
 import { ErroDoPainel, lerJson, obterCalculo, rota } from "@/lib/pricetax"
 
 export const dynamic = "force-dynamic"
@@ -29,6 +29,12 @@ export const POST = rota(async (req, { params }: Ctx) => {
       return Response.json(await montarTrilha(calculo, r))
     case "estorno":
       return Response.json(await montarEstorno(calculo, r))
+    case "ficha": {
+      const tipo = corpo.tipo === "item" ? "item" : "parceiro"
+      const sentido = corpo.sentido === "saida" ? "saida" : "entrada"
+      if (typeof corpo.valor !== "string" || !corpo.valor) throw new ErroDoPainel(400, "requisicao_invalida", "Informe o fornecedor, cliente ou item.")
+      return Response.json(await montarFicha(calculo, r, sentido, String(corpo.cenario ?? "base"), tipo, corpo.valor))
+    }
     default:
       throw new ErroDoPainel(404, "requisicao_invalida", "Capítulo desconhecido.")
   }

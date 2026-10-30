@@ -9,6 +9,8 @@
 
 Em todas as tabelas, os grupos **Impostos** e **Créditos** expandem (totais AR × DR e por tributo: ICMS, ICMS-ST, DIFAL, ISS, IPI, PIS/COFINS, IBS e CBS), com "Expandir tudo" e "Recolher tudo" por tabela e por capítulo. Compras e Vendas têm o **Monte a sua visão** (agrupadores e colunas à escolha, ordenação, paginação e CSV). DRE e fluxo de caixa saem no formato de demonstrativo, com linhas que abrem até o tributo, e gráficos em linha.
 
+**Fichas:** clicar num fornecedor, cliente ou item (nas tabelas, no Pareto e no Monte a sua visão) abre uma ficha lateral com a **memória de cálculo AR × DR** (valor da nota → base sem tributos → tributos que restam + IBS + CBS → novo valor; e o custo depois de cada crédito, ou o débito por tributo nas vendas, com as alíquotas efetivas), a lista do outro lado (itens do fornecedor, fornecedores do item) e as primeiras notas. Os cliques dentro da ficha encadeiam, com trilha e botão de voltar.
+
 Fora do alcance da API: despesas operacionais, IR e CSLL (a DRE vai até o lucro bruto) e a UF de destino (o destino é lido pelo CFOP).
 
 
