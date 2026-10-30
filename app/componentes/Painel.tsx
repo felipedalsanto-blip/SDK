@@ -4,7 +4,7 @@ import type { Calculo, CalculoDetalhe } from "@pricetax/sdk"
 import type { RamoId } from "@/lib/auditoria"
 import { REGIMES } from "@/lib/catalogo"
 import { Auditoria } from "./Auditoria"
-import { Erro } from "./comum"
+import { Erro, Esqueleto } from "./comum"
 import { Historia } from "./Historia"
 import { api, fmtCnpj, fmtMes, useBusca } from "./util"
 
@@ -44,16 +44,22 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
 
   return (
     <>
+      <a className="pular" href="#conteudo">
+        Pular para o conteúdo
+      </a>
       <header className="topo">
         <span className="produto">
           <strong>Pricetax</strong> · Reforma Tributária
         </span>
-        {empresa && <span className="assinatura">{empresa}</span>}
+        <span className="topo-direita">
+          {empresa && <span className="assinatura">{empresa}</span>}
+          <Tema />
+        </span>
       </header>
-      <main>
+      <main id="conteudo">
         {!calculoId && <EscolherCalculo lista={lista} onEscolher={escolher} />}
         {calculoId && detalhe.erro != null && <Erro erro={detalhe.erro} />}
-        {calculoId && !detalhe.dados && !detalhe.erro && <div className="vazio">Carregando o cálculo…</div>}
+        {calculoId && !detalhe.dados && !detalhe.erro && <Esqueleto alturas={[260, 48, 380, 320]} />}
         {calculoId && detalhe.dados && (
           <Relatorio key={detalhe.dados.id} calculo={detalhe.dados} calculos={lista.dados?.calculos ?? []} onCalculo={escolher} />
         )}
@@ -160,7 +166,9 @@ function Relatorio({ calculo, calculos, onCalculo }: { calculo: Detalhe; calculo
     <>
       {calculo.processando && <div className="alerta">Este cálculo está sendo refeito no app. Os números podem mudar quando terminar.</div>}
 
-      <section className="cabecalho">
+      <section className="heroi">
+        <span className="heroi-forma" aria-hidden="true" />
+        <span className="heroi-forma dois" aria-hidden="true" />
         <div>
           <h1 className="titulo-relatorio">A Reforma Tributária{calculo.empresa ? ` na ${calculo.empresa}` : ""}</h1>
           <span className="risca" />
@@ -256,6 +264,38 @@ function Relatorio({ calculo, calculos, onCalculo }: { calculo: Detalhe; calculo
         </p>
       </details>
     </>
+  )
+}
+
+type Tema = "auto" | "light" | "dark"
+const TEMAS: Record<Tema, string> = { auto: "Auto", light: "Claro", dark: "Escuro" }
+
+/** Claro, escuro ou o do sistema; a escolha fica neste navegador. */
+function Tema() {
+  const [tema, setTema] = useState<Tema>("auto")
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem("tema")
+      if (salvo === "light" || salvo === "dark") setTema(salvo)
+    } catch {}
+  }, [])
+  function escolher(t: Tema) {
+    setTema(t)
+    try {
+      if (t === "auto") localStorage.removeItem("tema")
+      else localStorage.setItem("tema", t)
+    } catch {}
+    if (t === "auto") delete document.documentElement.dataset.theme
+    else document.documentElement.dataset.theme = t
+  }
+  return (
+    <span className="tema" role="group" aria-label="Tema">
+      {(Object.keys(TEMAS) as Tema[]).map((t) => (
+        <button key={t} aria-pressed={tema === t} onClick={() => escolher(t)}>
+          {TEMAS[t]}
+        </button>
+      ))}
+    </span>
   )
 }
 

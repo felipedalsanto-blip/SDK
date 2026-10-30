@@ -1,7 +1,7 @@
 "use client"
 import type { Auditoria, RamoId } from "@/lib/auditoria"
 import type { Bloco, Executivo } from "@/lib/executivo"
-import { Erro } from "./comum"
+import { Contador, Erro, Esqueleto } from "./comum"
 import { CAUSAS, COR_CAUSA } from "./djf"
 import type { Detalhe, Escolha } from "./Painel"
 import { api, fmtBRL, fmtBRL0, fmtBRLCurto, useBusca, variacao } from "./util"
@@ -44,7 +44,7 @@ export function Historia({
   )
 
   if (exec.erro) return <Erro erro={exec.erro} />
-  if (!exec.dados) return <div className="vazio">Lendo os números do cálculo…</div>
+  if (!exec.dados) return <Esqueleto alturas={[300, 300, 380, 260]} />
   const d = exec.dados
   const alvo = d.serie.find((p) => p.ano === ano)
   if (!alvo) return <div className="alerta">Este cálculo não tem o ano {ano}.</div>
@@ -65,7 +65,7 @@ export function Historia({
 
 function Passo({ n, pergunta, children }: { n: number; pergunta: string; children: React.ReactNode }) {
   return (
-    <section className="passo">
+    <section className="passo surge" style={{ animationDelay: `${(n - 1) * 80}ms` }}>
       <div className="passo-cabeca">
         <span className="passo-numero">{n}</span>
         <h2>{pergunta}</h2>
@@ -89,7 +89,7 @@ function HojeContraAno({ hoje, valor, ano, pleno }: { hoje: number; valor: numbe
         <div key={rotulo} className="comparativo-linha">
           <span className="comparativo-rotulo">{rotulo}</span>
           <div className="comparativo-trilho">
-            <div style={{ width: `${(Math.max(0, v) / max) * 100}%`, background: cor }} />
+            <div className="cresce" style={{ width: `${(Math.max(0, v) / max) * 100}%`, background: cor }} />
           </div>
           <span className="comparativo-valor">{fmtBRL0(v)}</span>
         </div>
@@ -118,7 +118,7 @@ function Passo1({
   return (
     <Passo n={1} pergunta="Quanto muda?">
       <p className="numero-gigante">
-        {dif === 0 ? "Nada muda" : `${fmtBRL0(Math.abs(dif))} ${dif < 0 ? "a menos" : "a mais"}`}
+        {dif === 0 ? "Nada muda" : <Contador valor={Math.abs(dif)} formatar={fmtBRL0} sufixo={dif < 0 ? " a menos" : " a mais"} />}
       </p>
       <p className="frase">
         de imposto sobre o consumo a pagar em {alvo.ano}, comparado com hoje, {periodo}.
@@ -132,7 +132,7 @@ function Passo1({
               <div key={c.ano} className="mini-coluna" title={`${c.ano}: ${fmtBRL(c.saldo)}`}>
                 <span className="mini-valor">{fmtBRLCurto(c.saldo)}</span>
                 <div className="mini-trilho">
-                  <div style={{ height: `${(Math.max(0, c.saldo) / max) * 100}%`, background: c.cor }} />
+                  <div className="cresce-v" style={{ height: `${(Math.max(0, c.saldo) / max) * 100}%`, background: c.cor }} />
                 </div>
                 <span className={`mini-ano${c.ano === String(alvo.ano) ? " atual" : ""}`}>{c.ano}</span>
               </div>
@@ -215,10 +215,12 @@ function Passo3({ dados, erro, ano, onAbrir }: { dados: Auditoria | null; erro: 
   return (
     <Passo n={3} pergunta="Onde a empresa está perdendo dinheiro?">
       {erro != null && <Erro erro={erro} />}
-      {!dados && !erro && <p className="nota">Procurando…</p>}
+      {!dados && !erro && <Esqueleto alturas={[64, 220]} />}
       {dados && (
         <>
-          <p className="numero-gigante">{fmtBRL0(dados.djf)}</p>
+          <p className="numero-gigante">
+            <Contador valor={dados.djf} formatar={fmtBRL0} />
+          </p>
           <p className="frase">
             de <b>dinheiro jogado fora (DJF)</b> em {ano}, somando quatro causas que dá para corrigir.
           </p>
@@ -232,7 +234,7 @@ function Passo3({ dados, erro, ano, onAbrir }: { dados: Auditoria | null; erro: 
                     <span className="causa-valor">{r.disponivel ? fmtBRL0(r.valor) : "sem dado"}</span>
                   </span>
                   <span className="causa-trilho">
-                    <span style={{ width: `${dados.djf ? (r.valor / dados.djf) * 100 : 0}%`, background: COR_CAUSA[r.id] }} />
+                    <span className="cresce" style={{ width: `${dados.djf ? (r.valor / dados.djf) * 100 : 0}%`, background: COR_CAUSA[r.id] }} />
                   </span>
                 </button>
               ))}
@@ -251,7 +253,7 @@ function Passo4({ dados }: { dados: Auditoria | null }) {
     .slice(0, 3)
   return (
     <Passo n={4} pergunta="O que fazer?">
-      {!dados && <p className="nota">Montando as ações…</p>}
+      {!dados && <Esqueleto alturas={[180]} />}
       {dados && acoes.length === 0 && <p className="frase">Nenhuma perda encontrada neste ano.</p>}
       {acoes.length > 0 && (
         <ol className="acoes">

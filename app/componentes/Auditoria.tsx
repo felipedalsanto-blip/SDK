@@ -1,7 +1,7 @@
 "use client"
 import { useState } from "react"
 import type { Auditoria as Dados, Detalhe as Galho, Ramo, RamoId } from "@/lib/auditoria"
-import { Erro } from "./comum"
+import { Contador, Erro, Esqueleto } from "./comum"
 import { CAUSAS, COR_CAUSA } from "./djf"
 import type { Detalhe, Escolha } from "./Painel"
 import { api, fmtBRL0, fmtCnpj, fmtPct, useBusca } from "./util"
@@ -30,17 +30,18 @@ export function Auditoria({
     [calculo.id, escolha.regime, ano],
   )
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="vazio">Procurando onde a empresa está perdendo dinheiro…</div>
+  if (!dados) return <Esqueleto alturas={[180, 90, 90, 90, 90]} />
 
   const ramos = [...dados.ramos].sort((a, b) => b.valor - a.valor)
   const aberto = ramoInicial ?? ramos.find((r) => r.valor > 0)?.id ?? null
 
   return (
     <div className={carregando ? "carregando" : undefined} style={{ display: "grid", gap: "var(--espaco)" }}>
-      <section className="bloco">
+      <section className="bloco surge">
+        <span className="heroi-forma" aria-hidden="true" style={{ opacity: 0.9, width: 220, height: 190, right: -70, top: -80 }} />
         <h2>DJF · Dinheiro Jogado Fora em {dados.ano}</h2>
         <p className="numero-gigante" style={{ color: "var(--amarelo)" }}>
-          {fmtBRL0(dados.djf)}
+          <Contador valor={dados.djf} formatar={fmtBRL0} />
         </p>
         <p className="apoio">Quanto a empresa perde, {periodo}, por quatro causas que dá para corrigir.</p>
       </section>
@@ -161,7 +162,7 @@ function GalhoItem({ galho, maior, calculoId, corpo, ramo }: { galho: Galho; mai
         <span className="galho-valor">{fmtBRL0(galho.valor)}</span>
       </div>
       <div className="galho-barra">
-        <div style={{ width: `${maior ? (galho.valor / maior) * 100 : 0}%` }} />
+        <div className="cresce" style={{ width: `${maior ? (galho.valor / maior) * 100 : 0}%` }} />
       </div>
       {galho.abrir && abrirTexto && (
         <button className="link" onClick={() => setAberto((a) => !a)} aria-expanded={aberto}>

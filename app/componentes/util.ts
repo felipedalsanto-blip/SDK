@@ -148,3 +148,24 @@ export function fmtMes(v: string | null) {
 const brlInteiro = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })
 /** Reais sem centavos, para os números grandes de leitura rápida. */
 export const fmtBRL0 = (v: Valor) => (num(v) === null ? "n/d" : brlInteiro.format(num(v)!))
+
+/** Conta de 0 até o valor em ~0,9s (ease-out). Sem animação para quem pede menos movimento. */
+export function useContagem(valor: number) {
+  const [atual, setAtual] = useState(valor)
+  useEffect(() => {
+    if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setAtual(valor)
+      return
+    }
+    let quadro = 0
+    const inicio = performance.now()
+    const passo = (agora: number) => {
+      const t = Math.min(1, (agora - inicio) / 900)
+      setAtual(valor * (1 - Math.pow(1 - t, 3)))
+      if (t < 1) quadro = requestAnimationFrame(passo)
+    }
+    quadro = requestAnimationFrame(passo)
+    return () => cancelAnimationFrame(quadro)
+  }, [valor])
+  return atual
+}
