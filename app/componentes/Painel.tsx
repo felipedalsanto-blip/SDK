@@ -169,6 +169,8 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
   const [sentido, setSentido] = useState<Sentido>("ambas")
   const [filtro, setFiltro] = useState<Selecao["filtro"]>(null)
   const [aba, setAba] = useState<Aba>("compras")
+  // IPI e ICMS estimados na cadeia (não vieram no documento): dentro ou fora dos números.
+  const [semEstimados, setSemEstimados] = useState(false)
 
   // A aba fica na URL (?visao=classificacao) para dar para compartilhar o link.
   useEffect(() => {
@@ -241,6 +243,18 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
               ))}
             </select>
           </Campo>
+          {capitulo && aba !== "novo" && (
+            <Campo rotulo="Tributos estimados (IPI e ICMS)">
+              <div className="segmentos" role="group" aria-label="Tributos estimados">
+                <button aria-pressed={!semEstimados} onClick={() => setSemEstimados(false)}>
+                  Incluir
+                </button>
+                <button aria-pressed={semEstimados} onClick={() => setSemEstimados(true)}>
+                  Excluir
+                </button>
+              </div>
+            </Campo>
+          )}
           {!capitulo && (
           <>
           <Campo rotulo="Cenário de vendas">
@@ -301,13 +315,13 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
       </nav>
 
       {aba === "compras" ? (
-        <Compras calculoId={calculo.id} regime={regime} ano={ano} />
+        <Compras calculoId={calculo.id} regime={regime} ano={ano} semEstimados={semEstimados} />
       ) : aba === "vendas" ? (
-        <Vendas calculoId={calculo.id} regime={regime} ano={ano} />
+        <Vendas calculoId={calculo.id} regime={regime} ano={ano} semEstimados={semEstimados} />
       ) : aba === "dre" ? (
-        <Dre calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} />
+        <Dre calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} semEstimados={semEstimados} />
       ) : aba === "fluxo" ? (
-        <Fluxo calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} />
+        <Fluxo calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} semEstimados={semEstimados} />
       ) : aba === "novo" ? (
         <NovoProduto calculoId={calculo.id} regime={regime} ano={ano} />
       ) : aba === "geral" ? (

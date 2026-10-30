@@ -5,6 +5,7 @@ import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { CustoCliente } from "./CustoCliente"
 import { Explorador } from "./Explorador"
+import { AvisoEstimados } from "./Estimados"
 import { ProvedorFicha } from "./Ficha"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Diferenca, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
 
@@ -22,14 +23,14 @@ const EXPLICA: Record<string, string> = {
     "Repassa ao preço só o que o custo das compras sobe ou cai, para o lucro bruto ficar igual ao de hoje, sem olhar despesas. Mostra o quanto a venda precisa ser mais (ou pode ser menos) eficiente por causa do custo.",
 }
 
-export function Vendas({ calculoId, regime, ano }: { calculoId: string; regime: string; ano: number }) {
+export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: string; regime: string; ano: number; semEstimados: boolean }) {
   const [cenario, setCenario] = useState("base")
   const [quantidade, setQuantidade] = useState(10)
   const [sentido, setSentido] = useState<Sentido>("aumento")
   const [pareto, setPareto] = useState<"cliente" | "ncm" | "grupo">("cliente")
   const { dados, erro, carregando } = useBusca(
-    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/vendas`, { regime, cenario, quantidade, ano }, s),
-    [calculoId, regime, cenario, quantidade, ano],
+    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/vendas`, { regime, cenario, quantidade, ano, semEstimados }, s),
+    [calculoId, regime, cenario, quantidade, ano, semEstimados],
   )
 
   if (erro) return <Erro erro={erro} />
@@ -39,7 +40,7 @@ export function Vendas({ calculoId, regime, ano }: { calculoId: string; regime: 
   const p = dados.pareto
 
   return (
-    <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} sentido="saida" cenario={dados.cenario.id}>
+    <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} semEstimados={semEstimados} sentido="saida" cenario={dados.cenario.id}>
     <div className={carregando ? "carregando" : undefined}>
       <Capitulo numero="02" titulo={`Vendas · ${dados.ano}`} sub={`Os caminhos de preço para ${dados.ano} e o que cada um faz com o resultado.`}>
         <Bloco titulo="Os cenários de preço" leitura="Escolha um cenário para ver as listas e os padrões logo abaixo.">
@@ -76,6 +77,8 @@ export function Vendas({ calculoId, regime, ano }: { calculoId: string; regime: 
             </div>
           )}
         </Bloco>
+
+        <AvisoEstimados resumo={dados.estimados.resumo} excluidos={dados.estimados.excluidos} lado="vendas" />
 
         {atual && (
           <Bloco

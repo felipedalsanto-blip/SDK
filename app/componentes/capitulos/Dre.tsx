@@ -4,10 +4,11 @@ import type { Trilha } from "@/lib/capitulos"
 import { acharLinha, montarDre, type Linha, type PremissasIr } from "@/lib/demonstrativos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtPct, useBusca } from "../util"
+import { EstimadosAnos } from "./Estimados"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Demonstrativo, Diferenca, Indicador, LinhasAno, Premissa } from "./ui"
 
-export function useTrilha(calculoId: string, regime: string) {
-  return useBusca((s) => api<Trilha>(`/api/calculos/${calculoId}/capitulos/trilha`, { regime }, s), [calculoId, regime])
+export function useTrilha(calculoId: string, regime: string, semEstimados: boolean) {
+  return useBusca((s) => api<Trilha>(`/api/calculos/${calculoId}/capitulos/trilha`, { regime, semEstimados }, s), [calculoId, regime, semEstimados])
 }
 
 /** Os valores de uma linha do demonstrativo em cada cenário: [AR, ...anos]. */
@@ -85,8 +86,20 @@ export function FormPremissas({ p, mudar }: { p: PremissasIr; mudar: (e: Entrada
   )
 }
 
-export function Dre({ calculoId, regime, periodoMeses, ano }: { calculoId: string; regime: string; periodoMeses: number | null; ano: number }) {
-  const { dados, erro, carregando } = useTrilha(calculoId, regime)
+export function Dre({
+  calculoId,
+  regime,
+  periodoMeses,
+  ano,
+  semEstimados,
+}: {
+  calculoId: string
+  regime: string
+  periodoMeses: number | null
+  ano: number
+  semEstimados: boolean
+}) {
+  const { dados, erro, carregando } = useTrilha(calculoId, regime, semEstimados)
   const [cenario, setCenario] = useState<string | null>(null)
   const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
   if (erro) return <Erro erro={erro} />
@@ -147,6 +160,7 @@ export function Dre({ calculoId, regime, periodoMeses, ano }: { calculoId: strin
           <FormPremissas p={premissas} mudar={mudarPremissas} />
           <Alternar opcoes={Object.fromEntries(dados.cenarios.map((c) => [c.id, c.rotulo]))} valor={escolhido.id} onChange={(x) => setCenario(x)} />
           <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} destaque={iAno} />
+          <EstimadosAnos anos={dados.estimados.anos} excluidos={dados.estimados.excluidos} />
           <p className="cap-nota">
             Lucro bruto em {anoVisto} contra hoje, no cenário {escolhido.rotulo}: <Diferenca valor={(lb[iAno] ?? 0) - (lb[0] ?? 0)} subirEhBom />. Em{" "}
             {anos[anos.length - 1]}: <Diferenca valor={(lb[lb.length - 1] ?? 0) - (lb[0] ?? 0)} subirEhBom />.

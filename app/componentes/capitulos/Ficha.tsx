@@ -1,4 +1,5 @@
 "use client"
+import { EstimadosFicha } from "./Estimados"
 import { useEffect, useState } from "react"
 import type { Ficha as Dados, Memoria as DadosMemoria } from "@/lib/capitulos"
 import { TRIBUTOS } from "@/lib/tributos"
@@ -18,6 +19,7 @@ export function ProvedorFicha({
   calculoId,
   regime,
   ano,
+  semEstimados = false,
   sentido,
   cenario,
   children,
@@ -25,6 +27,7 @@ export function ProvedorFicha({
   calculoId: string
   regime: string
   ano: number
+  semEstimados?: boolean
   sentido: "entrada" | "saida"
   cenario?: string
   children: React.ReactNode
@@ -67,7 +70,7 @@ export function ProvedorFicha({
                 </button>
               </span>
             </header>
-            <ConteudoFicha key={`${atual.tipo}:${atual.valor}`} calculoId={calculoId} regime={regime} ano={ano} sentido={sentido} cenario={cenario} alvo={atual} />
+            <ConteudoFicha key={`${atual.tipo}:${atual.valor}`} calculoId={calculoId} regime={regime} ano={ano} semEstimados={semEstimados} sentido={sentido} cenario={cenario} alvo={atual} />
           </aside>
         </div>
       )}
@@ -75,10 +78,10 @@ export function ProvedorFicha({
   )
 }
 
-function ConteudoFicha({ calculoId, regime, ano, sentido, cenario, alvo }: { calculoId: string; regime: string; ano: number; sentido: "entrada" | "saida"; cenario?: string; alvo: Alvo }) {
+function ConteudoFicha({ calculoId, regime, ano, semEstimados, sentido, cenario, alvo }: { calculoId: string; regime: string; ano: number; semEstimados: boolean; sentido: "entrada" | "saida"; cenario?: string; alvo: Alvo }) {
   const { dados, erro } = useBusca(
-    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/ficha`, { regime, ano, sentido, cenario, tipo: alvo.tipo, valor: alvo.valor }, s),
-    [calculoId, regime, ano, sentido, cenario, alvo.tipo, alvo.valor],
+    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/ficha`, { regime, ano, semEstimados, sentido, cenario, tipo: alvo.tipo, valor: alvo.valor }, s),
+    [calculoId, regime, ano, semEstimados, sentido, cenario, alvo.tipo, alvo.valor],
   )
   if (erro) return <div className="ficha-corpo"><Erro erro={erro} /></div>
   if (!dados) return <div className="ficha-corpo"><p className="cap-vazio">Abrindo a ficha…</p></div>
@@ -115,6 +118,7 @@ function ConteudoFicha({ calculoId, regime, ano, sentido, cenario, alvo }: { cal
           À esquerda, a nota como é hoje: do valor com tributos até a base sem tributos{compras ? " e o custo depois do crédito" : ""}. À direita, a mesma base
           recalculada com as regras de {dados.ano}: os tributos atuais que ainda restam, mais o IBS e a CBS{compras ? ", e o novo crédito" : ""}.
         </p>
+        <EstimadosFicha e={dados.estimados} />
         <Memoria m={m} compras={compras} ano={dados.ano} />
       </section>
 

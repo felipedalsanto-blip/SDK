@@ -127,6 +127,10 @@ export function Explorador({ calculoId, regime, ano, sentido, cenario }: Props) 
 
   return (
     <div className="cap-explorar">
+      <p className="cap-nota">
+        <span className="cap-selo-est">ESTIMADO</span> Aqui os valores vêm do cálculo como estão: o IPI e o ICMS incluem os tributos estimados na cadeia,
+        mesmo com a chave do topo em &ldquo;Excluir&rdquo;.
+      </p>
       <div className="cap-explorar-barra">
         <div className="cap-explorar-agrupar">
           <span className="cap-kpi-rotulo">Agrupar por (na ordem)</span>

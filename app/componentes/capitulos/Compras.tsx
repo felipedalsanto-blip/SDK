@@ -4,16 +4,17 @@ import type { Compras as Dados, Qualidade, Suspeitos } from "@/lib/capitulos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { Explorador } from "./Explorador"
+import { AvisoEstimados } from "./Estimados"
 import { ProvedorFicha } from "./Ficha"
 import { Alternar, Bloco, Capitulo, Diferenca, Indicador, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros } from "./ui"
 
 type Sentido = "aumento" | "reducao"
 const SENTIDOS: Record<Sentido, string> = { aumento: "Quem aumenta", reducao: "Quem reduz" }
 
-export function Compras({ calculoId, regime, ano }: { calculoId: string; regime: string; ano: number }) {
+export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: string; regime: string; ano: number; semEstimados: boolean }) {
   const { dados, erro, carregando } = useBusca(
-    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/compras`, { regime, ano }, s),
-    [calculoId, regime, ano],
+    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/compras`, { regime, ano, semEstimados }, s),
+    [calculoId, regime, ano, semEstimados],
   )
   const [sentido, setSentido] = useState<Sentido>("aumento")
   const [pareto, setPareto] = useState<"fornecedor" | "ncm" | "grupo">("fornecedor")
@@ -25,7 +26,7 @@ export function Compras({ calculoId, regime, ano }: { calculoId: string; regime:
   const p = dados.pareto
 
   return (
-    <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} sentido="entrada">
+    <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} semEstimados={semEstimados} sentido="entrada">
     <div className={carregando ? "carregando" : undefined}>
       <Capitulo
         numero="01"
@@ -62,6 +63,8 @@ export function Compras({ calculoId, regime, ano }: { calculoId: string; regime:
             }
           />
         </div>
+
+        <AvisoEstimados resumo={dados.estimados.resumo} excluidos={dados.estimados.excluidos} lado="compras" />
 
         <Bloco
           titulo="Compras por regime tributário do fornecedor"

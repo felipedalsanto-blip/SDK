@@ -3,6 +3,7 @@ import type { CalculoDetalhe, EntradaConsulta, Metrica, Recorte } from "@priceta
 import { numeroCsv, registrosCsv } from "./csv"
 import { emCache, pricetax } from "./pricetax"
 import { lado, receitaLiquidaDe } from "./demonstrativos"
+import { chaveItem, chaves, lerEstimados, semEstimados, somaSemEstimados, type Ajuste, type Estimados, type ResumoEstimado } from "./estimados"
 import { METRICAS_DEBITO, METRICAS_DETALHE, TRIBUTOS } from "./tributos"
 
 /*
@@ -240,21 +241,25 @@ export type Compras = {
     custoCaiNcm: Pareto
   }
   qualidade: Qualidade
+  /** IPI e ICMS estimados na cadeia (não destacados no documento) e se o efeito deles foi retirado. */
+  estimados: { resumo: ResumoEstimado; excluidos: boolean }
   parcial: boolean
 }
 
-export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["regime"], anoPedido?: unknown): Promise<Compras> {
+export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["regime"], anoPedido?: unknown, sem = false): Promise<Compras> {
   const id = calculo.id
   const ano = anoAcao(calculo, anoPedido)
   const recorte: Recorte = { regime, ano, cenario_vendas: "base", cenario_compras: "base" }
   const base = { recorte, sentido: "entrada" as const }
+  const est = (await lerEstimados(calculo, regime, ano)).entrada
+  const aj = <G extends Grupo>(gs: G[], mapa: Map<string, Ajuste>, chave: (g: G) => string) => (sem ? semEstimados(gs, mapa, chave) : gs)
 
   const regimes = await consultarTudo(id, {
     ...base,
     agrupar_por: ["regime_outra_parte"],
     metricas: [...METRICAS_COMPRA, "parceiros_distintos", "credito_ar", "credito_dr"],
   })
-  const porRegime: PorRegime[] = regimes.grupos
+  const porRegime: PorRegime[] = aj(regimes.grupos, est.porRegime, chaves.regime)
     .map((g) => ({
       ...valores(g),
       regime: texto(g.regime_outra_parte),
@@ -271,7 +276,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
     metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
-  const parceiros: Parceiro[] = forn.grupos.map((g) => ({
+  const parceiros: Parceiro[] = aj(forn.grupos, est.porCnpj, chaves.cnpj).map((g) => ({
     ...valores(g),
     cnpj: texto(g.cnpj_outra_parte),
     nome: null,
@@ -284,7 +289,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
     metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
-  const itens: Item[] = itensG.grupos.map((g) => ({
+  const itens: Item[] = aj(itensG.grupos, est.porItem, chaves.item).map((g) => ({
     ...valores(g),
     descricao: texto(g.descricao_produto),
     ncm: texto(g.ncm),
@@ -321,7 +326,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
   const nomes = await nomesPorCnpj(id, recorte, "entrada", cnpjs)
   const comNome = <T extends { cnpj: string | null; nome: string | null }>(l: T[]) => l.map((x) => ({ ...x, nome: (x.cnpj && nomes.get(x.cnpj)) || null }))
 
-  const ncmLista = ncms.grupos.map((g) => ({ ncm: texto(g.ncm), ...valores(g) }))
+  const ncmLista = aj(ncms.grupos, est.porNcm, chaves.ncm).map((g) => ({ ncm: texto(g.ncm), ...valores(g) }))
   const grupos = new Map<string, number>()
   for (const x of ncmLista) {
     const cap = x.ncm ? x.ncm.slice(0, 2) : "sem NCM"
@@ -364,6 +369,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
       genericas: { ...qualidadeBruta.genericas, exemplos: comNome(qualidadeBruta.genericas.exemplos) },
       agregadas: { ...qualidadeBruta.agregadas, exemplos: comNome(qualidadeBruta.agregadas.exemplos) },
     },
+    estimados: { resumo: est.resumo, excluidos: sem },
     parcial: regimes.parcial || forn.parcial || itensG.parcial || ncms.parcial,
   }
 }
@@ -399,6 +405,7 @@ export type Vendas = {
   desvios: Desvio[]
   /** Valor das vendas e tributo de cada item (AR e DR), base do custo do cliente por perfil. */
   custoCliente: Record<string, number>
+  estimados: { resumo: ResumoEstimado; excluidos: boolean }
   pareto: { precoSobeCliente: Pareto; precoSobeNcm: Pareto; precoSobeGrupo: Pareto; precoCaiCliente: Pareto; precoCaiNcm: Pareto }
   parcial: boolean
 }
@@ -414,9 +421,19 @@ const METRICAS_VENDA_REGIME = [
   "valor_cbs_dr",
 ] as const satisfies readonly Metrica[]
 
-export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["regime"], cenarioId: string, qtd: number, anoPedido?: unknown): Promise<Vendas> {
+export async function montarVendas(
+  calculo: CalculoDetalhe,
+  regime: Recorte["regime"],
+  cenarioId: string,
+  qtd: number,
+  anoPedido?: unknown,
+  sem = false,
+): Promise<Vendas> {
   const id = calculo.id
   const ano = anoAcao(calculo, anoPedido)
+  // Estimados medidos no Com Reajuste e aplicados a todos os cenários de venda.
+  const est = (await lerEstimados(calculo, regime, ano)).saida
+  const aj = <G extends Grupo>(gs: G[], mapa: Map<string, Ajuste>, chave: (g: G) => string) => (sem ? semEstimados(gs, mapa, chave) : gs)
   const cenarios = cenariosDeVenda(calculo)
   const temBase = cenarios.some((c) => c.id === "base")
   // Custo Neutro: lê o Com Reajuste e multiplica o lado DR pelo fator do ano.
@@ -439,7 +456,7 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
       agrupar_por: ["regime_outra_parte"],
       metricas: [...METRICAS_VENDA_REGIME],
     })
-    const porRegime: VendaPorRegime[] = r.grupos
+    const porRegime: VendaPorRegime[] = aj(r.grupos, est.porRegime, chaves.regime)
       .map((g) => ({
         regime: texto(g.regime_outra_parte),
         nome: nomeRegime(texto(g.regime_outra_parte)),
@@ -478,21 +495,21 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
     const { grupos } = await pricetax().calculos.consultar(id, { ...base, metricas: metricasCliente })
     const g = grupos[0] ?? {}
     return Object.fromEntries(metricasCliente.map((m) => [m, n(g[m])])) as Record<string, number>
-  }), kLista)
+  }).then((c) => (sem ? somaSemEstimados(c, est.total) : c)), kLista)
   const cli = await consultarTudo(id, {
     ...base,
     agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
     metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
-  const clientes: Parceiro[] = escalarDr(cli.grupos, kLista).map((g) => ({ ...valores(g), cnpj: texto(g.cnpj_outra_parte), nome: null, regime: texto(g.regime_outra_parte) }))
+  const clientes: Parceiro[] = escalarDr(aj(cli.grupos, est.porCnpj, chaves.cnpj), kLista).map((g) => ({ ...valores(g), cnpj: texto(g.cnpj_outra_parte), nome: null, regime: texto(g.regime_outra_parte) }))
   const itensG = await consultarTudo(id, {
     ...base,
     agrupar_por: ["descricao_produto", "ncm", "cnpj_outra_parte"],
     metricas: METRICAS_LISTA,
     ordenar_por: { metrica: "valor_ar", direcao: "desc" },
   })
-  const itens: Item[] = escalarDr(itensG.grupos, kLista).map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: texto(g.cnpj_outra_parte), nome: null }))
+  const itens: Item[] = escalarDr(aj(itensG.grupos, est.porItem, chaves.item), kLista).map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: texto(g.cnpj_outra_parte), nome: null }))
   const ncms = await consultarTudo(id, { ...base, agrupar_por: ["ncm"], metricas: [...METRICAS_COMPRA] })
 
   // Desvios: o mesmo NCM com carga diferente conforme o destino (CFOP) e o regime do cliente.
@@ -535,7 +552,7 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
   const comNome = <T extends { cnpj: string | null; nome: string | null }>(l: T[]) => l.map((x) => ({ ...x, nome: (x.cnpj && nomes.get(x.cnpj)) || null }))
   const rotuloCli = (p: Parceiro) => (p.cnpj && nomes.get(p.cnpj)) || p.cnpj || "Sem CNPJ"
 
-  const ncmLista = escalarDr(ncms.grupos, kLista).map((g) => ({ ncm: texto(g.ncm), ...valores(g) }))
+  const ncmLista = escalarDr(aj(ncms.grupos, est.porNcm, chaves.ncm), kLista).map((g) => ({ ncm: texto(g.ncm), ...valores(g) }))
   const grupos = new Map<string, number>()
   for (const x of ncmLista) {
     const cap = x.ncm ? x.ncm.slice(0, 2) : "sem NCM"
@@ -551,6 +568,7 @@ export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["reg
     simples: { aumento: comNome(listas.simples.aumento), reducao: comNome(listas.simples.reducao) },
     desvios: desvios.slice(0, 15),
     custoCliente,
+    estimados: { resumo: est.resumo, excluidos: sem },
     pareto: {
       precoSobeCliente: pareto(clientes.map((p) => ({ chave: String(p.cnpj), rotulo: rotuloCli(p), valor: difPreco(p) }))),
       precoSobeNcm: pareto(ncmLista.map((x) => ({ chave: String(x.ncm), rotulo: x.ncm ?? "Sem NCM", valor: difPreco(x) }))),
@@ -577,6 +595,8 @@ export type Trilha = {
   ar: { vendas: Somas; compras: Somas }
   compras: Somas[]
   cenarios: (CenarioVenda & { vendas: Somas[] })[]
+  /** IPI e ICMS estimados na cadeia, por ano, e se o efeito deles foi retirado. */
+  estimados: { anos: { ano: number; compras: ResumoEstimado; vendas: ResumoEstimado }[]; excluidos: boolean }
 }
 
 const METRICAS_SAIDA = [
@@ -612,7 +632,7 @@ function somas(id: string, recorte: Recorte, sentido: "entrada" | "saida") {
   })
 }
 
-export async function montarTrilha(calculo: CalculoDetalhe, regime: Recorte["regime"]): Promise<Trilha> {
+export async function montarTrilha(calculo: CalculoDetalhe, regime: Recorte["regime"], sem = false): Promise<Trilha> {
   const id = calculo.id
   const todos = [...calculo.anos].sort((a, b) => a - b)
   const anos = todos.filter((a) => a >= ANO_ACAO).length ? todos.filter((a) => a >= ANO_ACAO) : todos
@@ -620,11 +640,18 @@ export async function montarTrilha(calculo: CalculoDetalhe, regime: Recorte["reg
   // Compras: uma consulta por ano (o cenário de venda não muda as compras).
   const compras: Somas[] = []
   for (const ano of anos) compras.push(await somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "entrada"))
+  // Estimados de cada ano (uma leitura das linhas por ano, com cache).
+  const estimados: Estimados[] = []
+  for (const ano of anos) estimados.push(await lerEstimados(calculo, regime, ano))
+  if (sem) compras.forEach((c, i) => (compras[i] = somaSemEstimados(c, estimados[i].entrada.total)))
   // Vendas: uma consulta por ano e cenário (até 7 × 3), em sequência e com cache.
   const resultado: Trilha["cenarios"] = []
   for (const c of cenarios) {
     const vendas: Somas[] = []
-    for (const ano of anos) vendas.push(await somas(id, { regime, ano, cenario_vendas: c.id, cenario_compras: "base" }, "saida"))
+    for (const [i, ano] of anos.entries()) {
+      const v = await somas(id, { regime, ano, cenario_vendas: c.id, cenario_compras: "base" }, "saida")
+      vendas.push(sem ? somaSemEstimados(v, estimados[i].saida.total) : v)
+    }
     resultado.push({ ...c, vendas })
   }
   const base = resultado.find((c) => c.id === "base")
@@ -636,6 +663,10 @@ export async function montarTrilha(calculo: CalculoDetalhe, regime: Recorte["reg
     ar: { vendas: resultado[0]?.vendas[0] ?? {}, compras: compras[0] ?? {} },
     compras,
     cenarios: resultado,
+    estimados: {
+      anos: anos.map((ano, i) => ({ ano, compras: estimados[i].entrada.resumo, vendas: estimados[i].saida.resumo })),
+      excluidos: sem,
+    },
   }
 }
 
@@ -706,6 +737,8 @@ export type Ficha = {
   sub: string | null
   regime: string | null
   memoria: Memoria
+  /** IPI e ICMS estimados na cadeia neste parceiro ou item (hoje e no ano), e se foram retirados. */
+  estimados: { ipiAr: number; ipiDr: number; icmsAr: number; icmsDr: number; excluidos: boolean }
   /** Na ficha do parceiro: os itens dele. Na do item: os parceiros que têm o item. */
   itens: Item[]
   parceiros: Parceiro[]
@@ -741,6 +774,7 @@ export async function montarFicha(
   tipo: "parceiro" | "item",
   valor: string,
   anoPedido?: unknown,
+  sem = false,
 ): Promise<Ficha> {
   const id = calculo.id
   const ano = anoAcao(calculo, anoPedido)
@@ -755,6 +789,18 @@ export async function montarFicha(
     const g = grupos[0] ?? {}
     return Object.fromEntries(METRICAS_MEMORIA[sentido].map((m) => [m, n(g[m])])) as Memoria
   })
+
+  // Estimados deste parceiro ou item (lidos no cenário Ajustado / Com Reajuste).
+  const lado = (await lerEstimados(calculo, regime, ano))[sentido]
+  const ajuste = (tipo === "parceiro" ? lado.porCnpj : lado.porDescricao).get(valor) ?? {}
+  const estimados = {
+    ipiAr: -(ajuste.valor_ipi_ar ?? 0),
+    ipiDr: -(ajuste.valor_ipi_dr ?? 0),
+    icmsAr: -(ajuste.valor_icms_ar ?? 0),
+    icmsDr: -(ajuste.valor_icms_dr ?? 0),
+    excluidos: sem,
+  }
+  const memoriaFinal = sem ? somaSemEstimados(memoria, ajuste) : memoria
 
   // O outro lado: itens do parceiro, ou parceiros do item.
   const lista = await consultarTudo(id, {
@@ -783,7 +829,8 @@ export async function montarFicha(
 
   const primeira = pagina.linhas[0] as Record<string, unknown> | undefined
   if (tipo === "parceiro") {
-    const itens: Item[] = lista.grupos.map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: valor, nome: null }))
+    const grupos = sem ? semEstimados(lista.grupos, lado.porItem, (g) => chaveItem(texto(g.descricao_produto) ?? "", texto(g.ncm) ?? "", valor)) : lista.grupos
+    const itens: Item[] = grupos.map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: valor, nome: null }))
     const nome = texto(primeira?.razao_social_outra_parte)
     return {
       tipo,
@@ -793,14 +840,31 @@ export async function montarFicha(
       titulo: nome ?? valor,
       sub: valor,
       regime: texto(primeira?.regime_outra_parte),
-      memoria,
+      memoria: memoriaFinal,
+      estimados,
       itens: itens.map((i) => ({ ...i, nome })),
       parceiros: [],
       notas,
       parcial: lista.parcial,
     }
   }
-  const parceiros: Parceiro[] = lista.grupos.map((g) => ({ ...valores(g), cnpj: texto(g.cnpj_outra_parte), nome: null, regime: texto(g.regime_outra_parte) }))
+  // Na ficha do item, cada parceiro recebe o ajuste do item com ele (somando os NCMs do item).
+  const porParceiro = new Map<string, Ajuste>()
+  if (sem) {
+    for (const [k, d] of lado.porItem) {
+      const [descricao, , cnpj] = k.split("|")
+      if (descricao !== valor) continue
+      const atual = porParceiro.get(cnpj) ?? {}
+      for (const [m, x] of Object.entries(d)) atual[m] = (atual[m] ?? 0) + x
+      porParceiro.set(cnpj, atual)
+    }
+  }
+  const parceiros: Parceiro[] = semEstimados(lista.grupos, porParceiro, chaves.cnpj).map((g) => ({
+    ...valores(g),
+    cnpj: texto(g.cnpj_outra_parte),
+    nome: null,
+    regime: texto(g.regime_outra_parte),
+  }))
   const nomes = await nomesPorCnpj(id, recorte, sentido, parceiros.slice(0, 100).map((p) => p.cnpj ?? ""))
   return {
     tipo,
@@ -810,7 +874,8 @@ export async function montarFicha(
     titulo: valor,
     sub: texto(primeira?.ncm) ? `NCM ${texto(primeira?.ncm)}` : null,
     regime: null,
-    memoria,
+    memoria: memoriaFinal,
+    estimados,
     itens: [],
     parceiros: parceiros.map((p) => ({ ...p, nome: (p.cnpj && nomes.get(p.cnpj)) || null })),
     notas,

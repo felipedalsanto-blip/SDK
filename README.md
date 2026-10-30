@@ -120,3 +120,13 @@ O precificador parte do **valor líquido** (custo + margem + outras despesas) qu
 - **IPI**: sobre o valor da operação.
 - **ICMS-ST** (só quando ativado ou identificado no histórico do NCM): (operação + IBS + CBS + IPI) × (1 + MVA) × alíquota interna do destino − ICMS próprio; MVA ajustada na venda interestadual.
 - **DIFAL** (venda interestadual a quem não revende): não contribuinte, recolhido pelo remetente, base única, dentro do preço; contribuinte (uso e consumo), recolhido pelo destinatário, base dupla, fora da nota.
+
+## IPI e ICMS estimados na cadeia
+
+Quando o documento não destaca o tributo, a Pricetax estima o IPI ou o ICMS embutido no preço ao longo da cadeia (`estimou_ipi`, `estimou_icms`). Esses valores não vieram do fornecedor nem do cliente, e o painel os identifica com o selo **ESTIMADO** em Compras, Vendas, fichas, DRE e fluxo de caixa. Como a marca não é dimensão da consulta agregada, `lib/estimados.ts` lê as linhas do ano (uma exportação por ano, com cache).
+
+A chave **Tributos estimados (IPI e ICMS) · Incluir / Excluir** no topo mostra o cálculo sem o efeito deles: no AR o valor pago é o mesmo, sai o tributo estimado e o crédito dele volta ao custo; no DR o tributo estimado volta a ser preço, o IBS e a CBS incidem sobre ele na proporção de cada linha e sai a parte estimada que restaria no ano. É uma aproximação, medida no cenário Ajustado/Com Reajuste e aplicada aos demais. "Monte a sua visão" mostra sempre os valores do cálculo como estão.
+
+## Aviso de qualidade da base (Compras)
+
+Ao fim de Compras, um aviso mostra quanto do valor comprado está em itens sem NCM (ou NCM inválido), com descrição genérica ("diversos", "material de consumo"…) ou com a mesma descrição em 3 ou mais NCMs, e quais são os maiores. Acima de 10% do valor vira atenção; acima de 30%, crítico.

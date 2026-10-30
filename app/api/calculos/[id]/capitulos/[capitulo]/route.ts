@@ -19,15 +19,17 @@ export const POST = rota(async (req, { params }: Ctx) => {
     throw new ErroDoPainel(400, "recorte_invalido", `Regime fora deste cálculo. Disponíveis: ${calculo.regimes.join(", ")}.`)
   }
   const r = regime as Recorte["regime"]
+  // Ver o cálculo sem o efeito do IPI e do ICMS estimados na cadeia.
+  const sem = corpo.semEstimados === true
   switch (capitulo) {
     case "compras":
-      return Response.json(await montarCompras(calculo, r, corpo.ano))
+      return Response.json(await montarCompras(calculo, r, corpo.ano, sem))
     case "vendas": {
       const qtd = [10, 20, 30, 40, 50].includes(Number(corpo.quantidade)) ? Number(corpo.quantidade) : 10
-      return Response.json(await montarVendas(calculo, r, String(corpo.cenario ?? "base"), qtd, corpo.ano))
+      return Response.json(await montarVendas(calculo, r, String(corpo.cenario ?? "base"), qtd, corpo.ano, sem))
     }
     case "trilha":
-      return Response.json(await montarTrilha(calculo, r))
+      return Response.json(await montarTrilha(calculo, r, sem))
     case "estorno":
       return Response.json(await montarEstorno(calculo, r))
     case "precificacao":
@@ -36,7 +38,7 @@ export const POST = rota(async (req, { params }: Ctx) => {
       const tipo = corpo.tipo === "item" ? "item" : "parceiro"
       const sentido = corpo.sentido === "saida" ? "saida" : "entrada"
       if (typeof corpo.valor !== "string" || !corpo.valor) throw new ErroDoPainel(400, "requisicao_invalida", "Informe o fornecedor, cliente ou item.")
-      return Response.json(await montarFicha(calculo, r, sentido, String(corpo.cenario ?? "base"), tipo, corpo.valor, corpo.ano))
+      return Response.json(await montarFicha(calculo, r, sentido, String(corpo.cenario ?? "base"), tipo, corpo.valor, corpo.ano, sem))
     }
     default:
       throw new ErroDoPainel(404, "requisicao_invalida", "Capítulo desconhecido.")

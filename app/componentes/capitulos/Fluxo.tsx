@@ -6,10 +6,23 @@ import { Erro } from "../comum"
 import { api, fmtBRL, fmtPct, useBusca } from "../util"
 import type { Trilha } from "@/lib/capitulos"
 import { FormPremissas, porCenario, usePremissasIr, useTrilha } from "./Dre"
+import { EstimadosAnos } from "./Estimados"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Demonstrativo, Indicador, LinhasAno, Premissa } from "./ui"
 
-export function Fluxo({ calculoId, regime, periodoMeses, ano }: { calculoId: string; regime: string; periodoMeses: number | null; ano: number }) {
-  const { dados, erro, carregando } = useTrilha(calculoId, regime)
+export function Fluxo({
+  calculoId,
+  regime,
+  periodoMeses,
+  ano,
+  semEstimados,
+}: {
+  calculoId: string
+  regime: string
+  periodoMeses: number | null
+  ano: number
+  semEstimados: boolean
+}) {
+  const { dados, erro, carregando } = useTrilha(calculoId, regime, semEstimados)
   const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
   const estorno = useBusca((s) => api<Estorno>(`/api/calculos/${calculoId}/capitulos/estorno`, { regime }, s), [calculoId, regime])
   const [cenario, setCenario] = useState<string | null>(null)
@@ -40,6 +53,7 @@ export function Fluxo({ calculoId, regime, periodoMeses, ano }: { calculoId: str
           <FormPremissas p={premissas} mudar={mudarPremissas} />
           <Alternar opcoes={Object.fromEntries(dados.cenarios.map((c) => [c.id, c.rotulo]))} valor={escolhido.id} onChange={(x) => setCenario(x)} />
           <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} destaque={Math.max(0, anos.indexOf(ano)) + 1} />
+          <EstimadosAnos anos={dados.estimados.anos} excluidos={dados.estimados.excluidos} />
         </Bloco>
 
         <Bloco
