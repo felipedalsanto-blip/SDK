@@ -500,3 +500,13 @@ tr.np-atual td { background: color-mix(in srgb, var(--pt-amarelo) 14%, transpare
 .np-especiais { display: grid; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); }
 .np-selo { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--pt-amarelo); color: #1a1a1a; }
 .np-check input:disabled + b { opacity: 0.5; }
+
+/* Aviso de qualidade da base (Compras). */
+.cap-qualidade { display: grid; gap: 12px; border: 1px solid var(--border); border-left: 6px solid var(--pt-cinza-medio); border-radius: 12px; padding: 16px 18px; background: var(--surface-1); }
+.cap-qualidade.atencao { border-left-color: var(--pt-amarelo); background: color-mix(in srgb, var(--pt-amarelo) 8%, var(--surface-1)); }
+.cap-qualidade.critico { border-left-color: var(--critical); background: color-mix(in srgb, var(--critical) 7%, var(--surface-1)); }
+.cap-qualidade-cabeca { display: grid; gap: 4px; font-size: 13.5px; }
+.cap-qualidade-cabeca b { font-size: 15px; }
+.cap-qualidade-cenarios { display: grid; gap: 10px; }
+.cap-qualidade-cenario { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+.cap-qualidade-cenario p { margin: 0; font-size: 13px; color: var(--text-secondary); }

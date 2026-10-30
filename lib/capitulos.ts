@@ -164,6 +164,66 @@ function pareto(lista: { chave: string; rotulo: string; valor: number }[], mostr
   return { fatias: fatias.slice(0, mostrar), total, para80, universo: positivos.length }
 }
 
+/* Qualidade da base: itens sem NCM, com descrição genérica ou agregados (uma descrição para vários NCMs). */
+
+export type ItemSuspeito = { descricao: string | null; ncm: string | null; cnpj: string | null; nome: string | null; itens: number; valorAr: number; ncms?: number }
+export type Suspeitos = { itens: number; valor: number; exemplos: ItemSuspeito[] }
+export type Qualidade = {
+  total: { itens: number; valor: number }
+  semNcm: Suspeitos
+  genericas: Suspeitos
+  agregadas: Suspeitos
+  /** Itens em ao menos uma das situações (sem contar duas vezes). */
+  afetado: { itens: number; valor: number }
+  nivel: "ok" | "atencao" | "critico"
+}
+
+const GENERICAS = [
+  "diversos", "diversas", "material", "materiais", "mercadoria", "mercadorias", "produto", "produtos", "outros", "outras", "item", "itens",
+  "peca", "pecas", "servico", "servicos", "despesa", "despesas", "consumo", "uso e consumo", "conforme nota", "conforme pedido", "cf nota", "ref nf",
+  "material de consumo", "material de escritorio", "material de limpeza", "revenda", "insumo", "insumos", "componentes", "acessorios", "sucata",
+  "nota fiscal", "nf", "venda", "compra", "kit", "lote", "volume", "volumes", "embalagem", "embalagens",
+]
+const normalizar = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim()
+
+/** Descrição que não identifica o item: vazia, curta, só números ou só palavras genéricas. */
+export function descricaoGenerica(d: string | null): boolean {
+  if (!d) return true
+  const t = normalizar(d)
+  if (t.length < 5 || /^[0-9 ]+$/.test(t)) return true
+  const semNumeros = t.replace(/[0-9]+/g, " ").replace(/\s+/g, " ").trim()
+  return GENERICAS.includes(semNumeros) || semNumeros.split(" ").every((p) => p.length <= 2 || GENERICAS.includes(p))
+}
+const ncmAusente = (ncm: string | null) => !ncm || !/^\d{8}$/.test(ncm) || /^0+$/.test(ncm)
+
+function avaliarQualidade(itens: Item[]): Qualidade {
+  const total = { itens: itens.reduce((s, x) => s + x.itens, 0), valor: itens.reduce((s, x) => s + x.valorAr, 0) }
+  const ncmsPorDescricao = new Map<string, Set<string>>()
+  for (const x of itens) {
+    if (!x.descricao) continue
+    const k = normalizar(x.descricao)
+    if (!ncmsPorDescricao.has(k)) ncmsPorDescricao.set(k, new Set())
+    ncmsPorDescricao.get(k)!.add(x.ncm ?? "")
+  }
+  const juntar = (lista: (Item & { ncms?: number })[]): Suspeitos => ({
+    itens: lista.reduce((s, x) => s + x.itens, 0),
+    valor: lista.reduce((s, x) => s + x.valorAr, 0),
+    exemplos: [...lista]
+      .sort((a, b) => b.valorAr - a.valorAr)
+      .slice(0, 10)
+      .map((x) => ({ descricao: x.descricao, ncm: x.ncm, cnpj: x.cnpj, nome: x.nome, itens: x.itens, valorAr: x.valorAr, ncms: x.ncms })),
+  })
+  const semNcm = itens.filter((x) => ncmAusente(x.ncm))
+  const genericas = itens.filter((x) => descricaoGenerica(x.descricao))
+  const agregadas = itens
+    .map((x) => ({ ...x, ncms: x.descricao ? (ncmsPorDescricao.get(normalizar(x.descricao))?.size ?? 0) : 0 }))
+    .filter((x) => x.ncms >= 3 && !descricaoGenerica(x.descricao))
+  const uniao = new Set([...semNcm, ...genericas, ...itens.filter((x) => agregadas.some((a) => a.descricao === x.descricao && a.ncm === x.ncm && a.cnpj === x.cnpj))])
+  const afetado = { itens: [...uniao].reduce((s, x) => s + x.itens, 0), valor: [...uniao].reduce((s, x) => s + x.valorAr, 0) }
+  const fatia = total.valor ? afetado.valor / total.valor : 0
+  return { total, semNcm: juntar(semNcm), genericas: juntar(genericas), agregadas: juntar(agregadas), afetado, nivel: fatia >= 0.3 ? "critico" : fatia >= 0.1 ? "atencao" : "ok" }
+}
+
 export type Compras = {
   ano: number
   cenario: string
@@ -179,6 +239,7 @@ export type Compras = {
     custoCaiFornecedor: Pareto
     custoCaiNcm: Pareto
   }
+  qualidade: Qualidade
   parcial: boolean
 }
 
@@ -242,8 +303,12 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
     simples: { aumento: topo(simplesLista, difCusto, "aumento", 10), reducao: topo(simplesLista, difCusto, "reducao", 10) },
   }
 
+  const qualidadeBruta = avaliarQualidade(itens)
+  const exemplos = [...qualidadeBruta.semNcm.exemplos, ...qualidadeBruta.genericas.exemplos, ...qualidadeBruta.agregadas.exemplos]
+
   // Nomes só dos CNPJs que aparecem nas listas (uma exportação filtrada).
   const cnpjs = [
+    ...exemplos,
     ...resultado.fornecedores.aumento,
     ...resultado.fornecedores.reducao,
     ...resultado.simples.aumento,
@@ -292,6 +357,12 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
       custoSobeGrupo: pareto([...grupos].map(([k, v]) => ({ chave: k, rotulo: k === "sem NCM" ? "Sem NCM" : `Capítulo ${k}`, valor: v }))),
       custoCaiFornecedor: pareto(parceiros.map((p) => ({ chave: String(p.cnpj), rotulo: rotuloForn(p), valor: -difCusto(p) }))),
       custoCaiNcm: pareto(ncmLista.map((x) => ({ chave: String(x.ncm), rotulo: x.ncm ?? "Sem NCM", valor: -difCusto(x) }))),
+    },
+    qualidade: {
+      ...qualidadeBruta,
+      semNcm: { ...qualidadeBruta.semNcm, exemplos: comNome(qualidadeBruta.semNcm.exemplos) },
+      genericas: { ...qualidadeBruta.genericas, exemplos: comNome(qualidadeBruta.genericas.exemplos) },
+      agregadas: { ...qualidadeBruta.agregadas, exemplos: comNome(qualidadeBruta.agregadas.exemplos) },
     },
     parcial: regimes.parcial || forn.parcial || itensG.parcial || ncms.parcial,
   }

@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import type { Compras as Dados } from "@/lib/capitulos"
+import type { Compras as Dados, Qualidade, Suspeitos } from "@/lib/capitulos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { Explorador } from "./Explorador"
@@ -205,6 +205,8 @@ export function Compras({ calculoId, regime, ano }: { calculoId: string; regime:
           </div>
         </Bloco>
 
+        <AvisoQualidade q={dados.qualidade} />
+
         <Premissa>
           Fonte: cálculo da Pricetax, ano {dados.ano}, cenário de compras {dados.cenario}. AR = regras de hoje; DR = regras de {dados.ano}.
           {dados.parcial && " As listas consideram os 2.000 maiores grupos por valor de compra."}
@@ -212,5 +214,102 @@ export function Compras({ calculoId, regime, ano }: { calculoId: string; regime:
       </Capitulo>
     </div>
     </ProvedorFicha>
+  )
+}
+
+const CENARIOS_QUALIDADE: { chave: "semNcm" | "genericas" | "agregadas"; titulo: string; risco: string }[] = [
+  {
+    chave: "semNcm",
+    titulo: "Itens sem NCM (ou com NCM inválido)",
+    risco:
+      "Sem NCM não há como identificar redução de alíquota, anexo da LC 214, monofásico ou IPI do produto, e a tendência é cair na regra geral. O IBS e a CBS podem estar acima (benefício não aproveitado) ou abaixo (crédito que não existe) do correto.",
+  },
+  {
+    chave: "genericas",
+    titulo: "Descrição genérica",
+    risco:
+      "\"Diversos\", \"material de consumo\", \"conforme nota\"… não identificam o produto. Não dá para conferir o cClassTrib item a item nem negociar com o fornecedor pelo produto: a análise vira uma média.",
+  },
+  {
+    chave: "agregadas",
+    titulo: "Mesma descrição em vários NCMs",
+    risco:
+      "A mesma descrição aparece com 3 ou mais NCMs: sinal de cadastro que agrupa produtos diferentes ou de lançamento resumido. O efeito de cada produto fica misturado e a análise deixa de ser linha a linha.",
+  },
+]
+
+/** Aviso ao fim de Compras: quanto da base pode estar distorcido por cadastro ruim. */
+function AvisoQualidade({ q }: { q: Qualidade }) {
+  const [aberto, setAberto] = useState<string | null>(null)
+  const fatia = q.total.valor ? q.afetado.valor / q.total.valor : 0
+  if (q.afetado.itens === 0)
+    return <p className="cap-nota">Qualidade da base: todos os itens de compra têm NCM e descrição específica.</p>
+  const titulo =
+    q.nivel === "critico"
+      ? "Atenção: parte grande das compras pode estar com a análise distorcida"
+      : q.nivel === "atencao"
+        ? "Atenção: há compras com cadastro que prejudica a análise"
+        : "Qualidade da base: poucos itens com cadastro incompleto"
+  return (
+    <div className={`cap-qualidade ${q.nivel}`} role={q.nivel === "ok" ? undefined : "alert"}>
+      <div className="cap-qualidade-cabeca">
+        <span className="cap-kpi-rotulo">Qualidade da base de compras</span>
+        <b>{titulo}</b>
+        <span>
+          {fmtInt(q.afetado.itens)} itens, {fmtBRL(q.afetado.valor)} ({fmtPct(fatia)} do valor das compras), estão sem NCM, com descrição genérica ou com a
+          mesma descrição em vários NCMs. Nesses itens a análise não é linha a linha: o resultado de fornecedores, itens e Pareto pode estar distorcido.
+        </span>
+      </div>
+      <div className="cap-qualidade-cenarios">
+        {CENARIOS_QUALIDADE.map(({ chave, titulo, risco }) => {
+          const x: Suspeitos = q[chave]
+          if (!x.itens) return null
+          return (
+            <div key={chave} className="cap-qualidade-cenario">
+              <button className="cap-dem-abrir" aria-expanded={aberto === chave} onClick={() => setAberto((a) => (a === chave ? null : chave))}>
+                <span aria-hidden="true">{aberto === chave ? "▾" : "▸"}</span> <b>{titulo}</b>
+              </button>
+              <span className="cap-sub">
+                {fmtInt(x.itens)} itens · {fmtBRL(x.valor)} ({q.total.valor ? fmtPct(x.valor / q.total.valor) : "n/d"} das compras)
+              </span>
+              <p>{risco}</p>
+              {aberto === chave && (
+                <div className="tabela-rolagem">
+                  <table className="cap-tabela">
+                    <thead>
+                      <tr>
+                        <th>Descrição</th>
+                        <th>NCM</th>
+                        <th>Fornecedor</th>
+                        <th className="num">Itens</th>
+                        <th className="num">Valor hoje</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {x.exemplos.map((e, i) => (
+                        <tr key={i}>
+                          <td className="texto">{e.descricao ?? "Sem descrição"}</td>
+                          <td>
+                            {e.ncm ?? "—"}
+                            {e.ncms ? <span className="cap-sub">{e.ncms} NCMs com esta descrição</span> : null}
+                          </td>
+                          <td className="texto">{e.nome ?? e.cnpj ?? "—"}</td>
+                          <td className="num">{fmtInt(e.itens)}</td>
+                          <td className="num">{fmtBRL(e.valorAr)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <p className="cap-nota">
+        Como resolver: completar o NCM no cadastro do produto, trocar descrições genéricas pela descrição do item na nota do fornecedor e separar
+        produtos diferentes que estão sob o mesmo código. Depois, refazer o cálculo no app da Pricetax.
+      </p>
+    </div>
   )
 }
