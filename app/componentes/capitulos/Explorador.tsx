@@ -12,13 +12,13 @@ const NOME_COLUNA = Object.fromEntries(GRUPOS_COLUNAS.flatMap((g) => g.metricas.
 const ehPercentual = (m: string) => m.startsWith("carga_efetiva")
 const ehContagem = (m: string) => m === "itens" || m === "quantidade"
 
-type Props = { calculoId: string; regime: string; sentido: "entrada" | "saida"; cenario?: string }
+type Props = { calculoId: string; regime: string; ano: number; sentido: "entrada" | "saida"; cenario?: string }
 
 /**
  * Monte a sua visão: escolha os agrupadores (na ordem), as colunas por grupo e a ordenação.
  * Nasce na visão por item com o fornecedor (compras) ou cliente (vendas).
  */
-export function Explorador({ calculoId, regime, sentido, cenario }: Props) {
+export function Explorador({ calculoId, regime, ano, sentido, cenario }: Props) {
   const compras = sentido === "entrada"
   const [agrupar, setAgrupar] = useState<Agrupador[]>(["descricao_produto", "cnpj_outra_parte"])
   const [colunas, setColunas] = useState<string[]>(
@@ -33,7 +33,7 @@ export function Explorador({ calculoId, regime, sentido, cenario }: Props) {
   const abrir = useAbrirFicha()
 
   const ordenacao = colunas.includes(ordenar) ? ordenar : colunas[0]
-  const chave = JSON.stringify({ calculoId, regime, sentido, cenario, agrupar, colunas, ordenacao, direcao })
+  const chave = JSON.stringify({ calculoId, regime, ano, sentido, cenario, agrupar, colunas, ordenacao, direcao })
 
   async function carregar(pagina: number) {
     setCarregando(true)
@@ -41,6 +41,7 @@ export function Explorador({ calculoId, regime, sentido, cenario }: Props) {
     try {
       const r = await api<Exploracao>(`/api/calculos/${calculoId}/explorar`, {
         regime,
+        ano,
         sentido,
         cenario,
         agrupar_por: agrupar,

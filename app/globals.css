@@ -493,3 +493,7 @@ tr.np-atual td { background: color-mix(in srgb, var(--pt-amarelo) 14%, transpare
 .np-gerais { margin-top: 8px; font-size: 12.5px; color: var(--text-secondary); }
 .np-gerais summary { cursor: pointer; font-weight: 600; }
 .np-ref .cap-sub { margin-top: 6px; }
+
+/* Ano escolhido no topo, em destaque nos demonstrativos. */
+.cap-demonstrativo .cap-col-destaque { background: color-mix(in srgb, var(--pt-amarelo) 16%, transparent); }
+.cap-demonstrativo th.cap-col-destaque { box-shadow: inset 0 -3px 0 var(--pt-amarelo); }

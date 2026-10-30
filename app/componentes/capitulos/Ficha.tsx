@@ -17,12 +17,14 @@ const NOME_REGIME: Record<string, string> = { simplesNacional: "Simples Nacional
 export function ProvedorFicha({
   calculoId,
   regime,
+  ano,
   sentido,
   cenario,
   children,
 }: {
   calculoId: string
   regime: string
+  ano: number
   sentido: "entrada" | "saida"
   cenario?: string
   children: React.ReactNode
@@ -65,7 +67,7 @@ export function ProvedorFicha({
                 </button>
               </span>
             </header>
-            <ConteudoFicha key={`${atual.tipo}:${atual.valor}`} calculoId={calculoId} regime={regime} sentido={sentido} cenario={cenario} alvo={atual} />
+            <ConteudoFicha key={`${atual.tipo}:${atual.valor}`} calculoId={calculoId} regime={regime} ano={ano} sentido={sentido} cenario={cenario} alvo={atual} />
           </aside>
         </div>
       )}
@@ -73,10 +75,10 @@ export function ProvedorFicha({
   )
 }
 
-function ConteudoFicha({ calculoId, regime, sentido, cenario, alvo }: { calculoId: string; regime: string; sentido: "entrada" | "saida"; cenario?: string; alvo: Alvo }) {
+function ConteudoFicha({ calculoId, regime, ano, sentido, cenario, alvo }: { calculoId: string; regime: string; ano: number; sentido: "entrada" | "saida"; cenario?: string; alvo: Alvo }) {
   const { dados, erro } = useBusca(
-    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/ficha`, { regime, sentido, cenario, tipo: alvo.tipo, valor: alvo.valor }, s),
-    [calculoId, regime, sentido, cenario, alvo.tipo, alvo.valor],
+    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/ficha`, { regime, ano, sentido, cenario, tipo: alvo.tipo, valor: alvo.valor }, s),
+    [calculoId, regime, ano, sentido, cenario, alvo.tipo, alvo.valor],
   )
   if (erro) return <div className="ficha-corpo"><Erro erro={erro} /></div>
   if (!dados) return <div className="ficha-corpo"><p className="cap-vazio">Abrindo a ficha…</p></div>

@@ -65,7 +65,9 @@ export function cenariosDeVenda(calculo: CalculoDetalhe): CenarioVenda[] {
   return lista
 }
 
-export function anoAcao(calculo: CalculoDetalhe) {
+/** O ano pedido na tela, se o cálculo o tem; senão 2027 (o ano das ações) ou o primeiro disponível. */
+export function anoAcao(calculo: CalculoDetalhe, pedido?: unknown) {
+  if (calculo.anos.includes(Number(pedido))) return Number(pedido)
   return calculo.anos.includes(ANO_ACAO) ? ANO_ACAO : [...calculo.anos].sort((a, b) => a - b)[0]
 }
 
@@ -180,9 +182,9 @@ export type Compras = {
   parcial: boolean
 }
 
-export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["regime"]): Promise<Compras> {
+export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["regime"], anoPedido?: unknown): Promise<Compras> {
   const id = calculo.id
-  const ano = anoAcao(calculo)
+  const ano = anoAcao(calculo, anoPedido)
   const recorte: Recorte = { regime, ano, cenario_vendas: "base", cenario_compras: "base" }
   const base = { recorte, sentido: "entrada" as const }
 
@@ -341,9 +343,9 @@ const METRICAS_VENDA_REGIME = [
   "valor_cbs_dr",
 ] as const satisfies readonly Metrica[]
 
-export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["regime"], cenarioId: string, qtd: number): Promise<Vendas> {
+export async function montarVendas(calculo: CalculoDetalhe, regime: Recorte["regime"], cenarioId: string, qtd: number, anoPedido?: unknown): Promise<Vendas> {
   const id = calculo.id
-  const ano = anoAcao(calculo)
+  const ano = anoAcao(calculo, anoPedido)
   const cenarios = cenariosDeVenda(calculo)
   const temBase = cenarios.some((c) => c.id === "base")
   // Custo Neutro: lê o Com Reajuste e multiplica o lado DR pelo fator do ano.
@@ -667,9 +669,10 @@ export async function montarFicha(
   cenarioId: string,
   tipo: "parceiro" | "item",
   valor: string,
+  anoPedido?: unknown,
 ): Promise<Ficha> {
   const id = calculo.id
-  const ano = anoAcao(calculo)
+  const ano = anoAcao(calculo, anoPedido)
   const cenario = sentido === "saida" && calculo.cenarios.some((c) => c.id === cenarioId) ? cenarioId : "base"
   const recorte: Recorte = { regime, ano, cenario_vendas: cenario, cenario_compras: "base" }
   const filtros: Record<string, (string | number | null)[]> = { [tipo === "parceiro" ? "cnpj_outra_parte" : "descricao_produto"]: [valor] }

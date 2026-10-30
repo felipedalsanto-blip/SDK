@@ -13,7 +13,7 @@ const TOPS = { "10": "Top 10", "20": "Top 20", "30": "Top 30", "40": "Top 40", "
 
 const EXPLICA: Record<string, string> = {
   "Sem Ajuste":
-    "A empresa mantém em 2027 o mesmo preço de hoje. A diferença de tributos sai (ou entra) na margem, e o efeito aparece na DRE e no fluxo de caixa.",
+    "A empresa mantém o mesmo preço de hoje. A diferença de tributos sai (ou entra) na margem, e o efeito aparece na DRE e no fluxo de caixa.",
   "Com Reajuste":
     "O cenário conservador: tira do preço os tributos atuais, inclui os novos e os que permanecem, sem considerar o que muda no custo das compras.",
   "Preço Alvo":
@@ -22,26 +22,26 @@ const EXPLICA: Record<string, string> = {
     "Repassa ao preço só o que o custo das compras sobe ou cai, para o lucro bruto ficar igual ao de hoje, sem olhar despesas. Mostra o quanto a venda precisa ser mais (ou pode ser menos) eficiente por causa do custo.",
 }
 
-export function Vendas({ calculoId, regime }: { calculoId: string; regime: string }) {
+export function Vendas({ calculoId, regime, ano }: { calculoId: string; regime: string; ano: number }) {
   const [cenario, setCenario] = useState("base")
   const [quantidade, setQuantidade] = useState(10)
   const [sentido, setSentido] = useState<Sentido>("aumento")
   const [pareto, setPareto] = useState<"cliente" | "ncm" | "grupo">("cliente")
   const { dados, erro, carregando } = useBusca(
-    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/vendas`, { regime, cenario, quantidade }, s),
-    [calculoId, regime, cenario, quantidade],
+    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/vendas`, { regime, cenario, quantidade, ano }, s),
+    [calculoId, regime, cenario, quantidade, ano],
   )
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="cartao vazio">Lendo as vendas de 2027 em todos os cenários…</div>
+  if (!dados) return <div className="cartao vazio">Lendo as vendas de {ano} em todos os cenários…</div>
   const atual = dados.cenarios.find((c) => c.id === dados.cenario.id) ?? dados.cenarios[0]
   const sobe = sentido === "aumento"
   const p = dados.pareto
 
   return (
-    <ProvedorFicha calculoId={calculoId} regime={regime} sentido="saida" cenario={dados.cenario.id}>
+    <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} sentido="saida" cenario={dados.cenario.id}>
     <div className={carregando ? "carregando" : undefined}>
-      <Capitulo numero="02" titulo={`Vendas · ${dados.ano}`} sub="Os caminhos de preço para 2027 e o que cada um faz com o resultado.">
+      <Capitulo numero="02" titulo={`Vendas · ${dados.ano}`} sub={`Os caminhos de preço para ${dados.ano} e o que cada um faz com o resultado.`}>
         <Bloco titulo="Os cenários de preço" leitura="Escolha um cenário para ver as listas e os padrões logo abaixo.">
           <div className="cap-cenarios">
             {dados.cenarios.map((c) => (
@@ -226,7 +226,7 @@ export function Vendas({ calculoId, regime }: { calculoId: string; regime: strin
           titulo="Monte a sua visão"
           leitura={`Nasce por item e cliente, no cenário ${dados.cenario.rotulo}. Troque os agrupadores (NCM, CFOP, regime do cliente…), abra impostos e débitos por tributo e baixe em CSV.`}
         >
-          <Explorador calculoId={calculoId} regime={regime} sentido="saida" cenario={dados.cenario.id} />
+          <Explorador calculoId={calculoId} regime={regime} ano={ano} sentido="saida" cenario={dados.cenario.id} />
         </Bloco>
 
         <Bloco titulo="Plano comercial" leitura="Do ponto de vista da empresa que vende. Comece pelos clientes do Pareto.">

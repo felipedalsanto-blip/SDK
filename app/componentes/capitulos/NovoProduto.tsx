@@ -60,7 +60,7 @@ function cheiasDe(d: Precificacao): Entrada["cheias"] {
   return Object.fromEntries(d.anos.map((a) => [String(a), { ibs: pct2(d.cheias[a]?.ibs ?? 0), cbs: pct2(d.cheias[a]?.cbs ?? 0) }]))
 }
 
-export function NovoProduto({ calculoId, regime }: { calculoId: string; regime: string }) {
+export function NovoProduto({ calculoId, regime, ano }: { calculoId: string; regime: string; ano: number }) {
   const { dados, erro } = useBusca(
     (s) => api<Precificacao>(`/api/calculos/${calculoId}/capitulos/precificacao`, { regime }, s),
     [calculoId, regime],
@@ -79,6 +79,11 @@ export function NovoProduto({ calculoId, regime }: { calculoId: string; regime: 
     if (!dados.anos.includes(junto.ano)) junto.ano = base.ano
     setE(junto)
   }, [dados, chave])
+
+  // Trocar o ano no topo do painel leva a simulação junto (dá para mudar de novo aqui dentro).
+  useEffect(() => {
+    if (dados?.anos.includes(ano)) setE((atual) => (atual && atual.ano !== ano ? { ...atual, ano } : atual))
+  }, [ano, dados])
 
   const mudar = (parcial: Partial<Entrada>) =>
     setE((atual) => {

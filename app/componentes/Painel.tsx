@@ -232,8 +232,6 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
               ))}
             </select>
           </Campo>
-          {!capitulo && (
-          <>
           <Campo rotulo="Ano">
             <select value={ano} onChange={(e) => setAno(Number(e.target.value))}>
               {anos.map((a) => (
@@ -243,6 +241,8 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
               ))}
             </select>
           </Campo>
+          {!capitulo && (
+          <>
           <Campo rotulo="Cenário de vendas">
             <select value={cenarioVendas} onChange={(e) => setCenarioVendas(e.target.value)}>
               {calculo.cenarios.map((c) => (
@@ -274,7 +274,11 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
           )}
           {capitulo && (
             <p className="sub" style={{ alignSelf: "center", margin: 0 }}>
-              Compras e listas de vendas em 2027 (o ano das ações); DRE e fluxo de caixa de 2027 a 2033, em todos os cenários de venda.
+              {aba === "dre" || aba === "fluxo"
+                ? `DRE e fluxo de caixa mostram todos os anos da transição; ${ano} fica em destaque.`
+                : aba === "novo"
+                  ? `A nota do novo produto é montada para ${ano}; dá para trocar o ano na simulação.`
+                  : `Compras e vendas analisadas em ${ano}.`}
             </p>
           )}
           {!capitulo && filtro && (
@@ -297,15 +301,15 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
       </nav>
 
       {aba === "compras" ? (
-        <Compras calculoId={calculo.id} regime={regime} />
+        <Compras calculoId={calculo.id} regime={regime} ano={ano} />
       ) : aba === "vendas" ? (
-        <Vendas calculoId={calculo.id} regime={regime} />
+        <Vendas calculoId={calculo.id} regime={regime} ano={ano} />
       ) : aba === "dre" ? (
-        <Dre calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} />
+        <Dre calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} />
       ) : aba === "fluxo" ? (
-        <Fluxo calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} />
+        <Fluxo calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} />
       ) : aba === "novo" ? (
-        <NovoProduto calculoId={calculo.id} regime={regime} />
+        <NovoProduto calculoId={calculo.id} regime={regime} ano={ano} />
       ) : aba === "geral" ? (
         <>
           <Resumo calculoId={calculo.id} selecao={selecao} chave={chave} />

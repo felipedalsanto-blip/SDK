@@ -104,3 +104,7 @@ uma a uma) e a projeção, uma por ano. Tudo fica em cache no servidor por 10 mi
 - **Alíquota cheia de IBS e CBS**: a alíquota que a API de cálculos devolve nas vendas de tributação integral do ano (sem elas, tributo ÷ base ajustada pela redução). Editável.
 - **Metodologia**: "Transição completa" (tributos atuais que restam no ano, por dentro, + IBS e CBS por fora) ou "Só os novos tributos" (preço líquido + IBS e CBS, sem desonerar nem incluir os atuais).
 - Em desenvolvimento atrás de proxy, o Node precisa de `NODE_USE_ENV_PROXY=1` para chegar à calculadora da Receita.
+
+## Ano no topo do painel
+
+O seletor de ano vale para todas as abas: Compras, Vendas, fichas e "Monte a sua visão" passam a ler o ano escolhido (padrão 2027); DRE e fluxo de caixa continuam mostrando todos os anos, com o escolhido em destaque; o Novo produto monta a nota para esse ano.

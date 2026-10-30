@@ -8,7 +8,7 @@ import type { Trilha } from "@/lib/capitulos"
 import { FormPremissas, porCenario, usePremissasIr, useTrilha } from "./Dre"
 import { Alternar, Bloco, COR_CENARIO, Capitulo, Demonstrativo, Indicador, LinhasAno, Premissa } from "./ui"
 
-export function Fluxo({ calculoId, regime, periodoMeses }: { calculoId: string; regime: string; periodoMeses: number | null }) {
+export function Fluxo({ calculoId, regime, periodoMeses, ano }: { calculoId: string; regime: string; periodoMeses: number | null; ano: number }) {
   const { dados, erro, carregando } = useTrilha(calculoId, regime)
   const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
   const estorno = useBusca((s) => api<Estorno>(`/api/calculos/${calculoId}/capitulos/estorno`, { regime }, s), [calculoId, regime])
@@ -39,7 +39,7 @@ export function Fluxo({ calculoId, regime, periodoMeses }: { calculoId: string; 
         >
           <FormPremissas p={premissas} mudar={mudarPremissas} />
           <Alternar opcoes={Object.fromEntries(dados.cenarios.map((c) => [c.id, c.rotulo]))} valor={escolhido.id} onChange={(x) => setCenario(x)} />
-          <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} />
+          <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} destaque={Math.max(0, anos.indexOf(ano)) + 1} />
         </Bloco>
 
         <Bloco

@@ -28,7 +28,7 @@ export async function explorar(calculo: CalculoDetalhe, corpo: Record<string, un
   const direcao = corpo.direcao === "asc" ? "asc" : "desc"
   const pagina = Math.max(0, Math.min(400, Number(corpo.pagina) || 0))
 
-  const ano = anoAcao(calculo)
+  const ano = anoAcao(calculo, corpo.ano)
   const recorte: Recorte = { regime: regime as Recorte["regime"], ano, cenario_vendas: cenario, cenario_compras: "base" }
   const entrada = {
     recorte,

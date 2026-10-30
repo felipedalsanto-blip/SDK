@@ -10,27 +10,27 @@ import { Alternar, Bloco, Capitulo, Diferenca, Indicador, Pareto, Plano, Premiss
 type Sentido = "aumento" | "reducao"
 const SENTIDOS: Record<Sentido, string> = { aumento: "Quem aumenta", reducao: "Quem reduz" }
 
-export function Compras({ calculoId, regime }: { calculoId: string; regime: string }) {
+export function Compras({ calculoId, regime, ano }: { calculoId: string; regime: string; ano: number }) {
   const { dados, erro, carregando } = useBusca(
-    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/compras`, { regime }, s),
-    [calculoId, regime],
+    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/compras`, { regime, ano }, s),
+    [calculoId, regime, ano],
   )
   const [sentido, setSentido] = useState<Sentido>("aumento")
   const [pareto, setPareto] = useState<"fornecedor" | "ncm" | "grupo">("fornecedor")
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="cartao vazio">Lendo as compras de 2027…</div>
+  if (!dados) return <div className="cartao vazio">Lendo as compras de {ano}…</div>
   const t = dados.totais
   const sobe = sentido === "aumento"
   const p = dados.pareto
 
   return (
-    <ProvedorFicha calculoId={calculoId} regime={regime} sentido="entrada">
+    <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} sentido="entrada">
     <div className={carregando ? "carregando" : undefined}>
       <Capitulo
         numero="01"
         titulo={`Compras · ${dados.ano}`}
-        sub={`O ano das ações. Cenário de compras ${dados.cenario}: o fornecedor tira os tributos atuais do preço e soma o IBS e a CBS.`}
+        sub={`${dados.ano === 2027 ? "O ano das ações. " : ""}Cenário de compras ${dados.cenario}: o fornecedor tira os tributos atuais do preço e soma o IBS e a CBS.`}
       >
         <div className="cap-kpis">
           <Indicador rotulo="Fornecedores" valor={fmtInt(t.fornecedores)} contexto={`${fmtInt(t.itens)} itens de compra`} />
@@ -151,7 +151,7 @@ export function Compras({ calculoId, regime }: { calculoId: string; regime: stri
           titulo="Monte a sua visão"
           leitura="Nasce por item e fornecedor. Troque os agrupadores (NCM, regime, CFOP, competência…), abra impostos e créditos por tributo e baixe em CSV."
         >
-          <Explorador calculoId={calculoId} regime={regime} sentido="entrada" />
+          <Explorador calculoId={calculoId} regime={regime} ano={ano} sentido="entrada" />
         </Bloco>
 
         <Bloco titulo="Plano de negociação com fornecedores" leitura="Do ponto de vista da empresa compradora. Comece pelos fornecedores do Pareto.">

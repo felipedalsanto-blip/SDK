@@ -85,7 +85,7 @@ export function FormPremissas({ p, mudar }: { p: PremissasIr; mudar: (e: Entrada
   )
 }
 
-export function Dre({ calculoId, regime, periodoMeses }: { calculoId: string; regime: string; periodoMeses: number | null }) {
+export function Dre({ calculoId, regime, periodoMeses, ano }: { calculoId: string; regime: string; periodoMeses: number | null; ano: number }) {
   const { dados, erro, carregando } = useTrilha(calculoId, regime)
   const [cenario, setCenario] = useState<string | null>(null)
   const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
@@ -101,12 +101,15 @@ export function Dre({ calculoId, regime, periodoMeses }: { calculoId: string; re
     porCenario(dados, montar, id).map(({ c, valores }) => ({ nome: c.rotulo, cor: COR_CENARIO[c.rotulo], valores: valores.slice(1) }))
   const ar = (id: string) => v(id)[0] ?? null
 
+  // O ano escolhido no topo: coluna em destaque e base da explicação da receita (sem ele, o primeiro ano).
+  const iAno = Math.max(0, anos.indexOf(ano)) + 1
+  const anoVisto = anos[iAno - 1]
   // Receita bruta de hoje − a do primeiro ano = tributos atuais que saem + mudança no preço líquido.
   const rb = v("rb")
   const ded = v("ded")
   const rl = v("rl")
-  const saemTributos = -(ded[0] ?? 0) + (ded[1] ?? 0)
-  const mudaPreco = (rl[0] ?? 0) - (rl[1] ?? 0)
+  const saemTributos = -(ded[0] ?? 0) + (ded[iAno] ?? 0)
+  const mudaPreco = (rl[0] ?? 0) - (rl[iAno] ?? 0)
   const lb = v("lb")
 
   return (
@@ -143,17 +146,17 @@ export function Dre({ calculoId, regime, periodoMeses }: { calculoId: string; re
         >
           <FormPremissas p={premissas} mudar={mudarPremissas} />
           <Alternar opcoes={Object.fromEntries(dados.cenarios.map((c) => [c.id, c.rotulo]))} valor={escolhido.id} onChange={(x) => setCenario(x)} />
-          <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} />
+          <Demonstrativo colunas={["Hoje (AR)", ...anos.map(String)]} linhas={linhas} destaque={iAno} />
           <p className="cap-nota">
-            Lucro bruto em {anos[anos.length - 1]} contra hoje, no cenário {escolhido.rotulo}:{" "}
-            <Diferenca valor={(lb[lb.length - 1] ?? 0) - (lb[0] ?? 0)} subirEhBom />.
+            Lucro bruto em {anoVisto} contra hoje, no cenário {escolhido.rotulo}: <Diferenca valor={(lb[iAno] ?? 0) - (lb[0] ?? 0)} subirEhBom />. Em{" "}
+            {anos[anos.length - 1]}: <Diferenca valor={(lb[lb.length - 1] ?? 0) - (lb[0] ?? 0)} subirEhBom />.
           </p>
         </Bloco>
 
-        <Bloco titulo={`Por que a receita bruta muda em ${anos[0]} · ${escolhido.rotulo}`}>
+        <Bloco titulo={`Por que a receita bruta muda em ${anoVisto} · ${escolhido.rotulo}`}>
           <div className="cap-kpis">
             <Indicador rotulo="Receita bruta hoje" valor={fmtBRL(rb[0] ?? 0)} contexto="com os tributos atuais dentro do preço" />
-            <Indicador rotulo={`Receita bruta ${anos[0]}`} valor={fmtBRL(rb[1] ?? 0)} contexto="sem IBS e CBS" />
+            <Indicador rotulo={`Receita bruta ${anoVisto}`} valor={fmtBRL(rb[iAno] ?? 0)} contexto="sem IBS e CBS" />
             <Indicador rotulo="Tributos atuais que saem da receita" valor={fmtBRL(saemTributos)} contexto="deduções de hoje menos as que restam" />
             <Indicador rotulo="Mudança no preço líquido" valor={fmtBRL(mudaPreco)} contexto="receita líquida de hoje menos a nova" />
           </div>

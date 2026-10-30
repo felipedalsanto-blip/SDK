@@ -473,7 +473,8 @@ export function LinhasAno({
  * Demonstrativo (DRE ou fluxo de caixa): linhas com valores por coluna, que abrem até o tributo.
  * Nasce com as linhas principais; "Expandir tudo" do capítulo ou da tabela abre todos os níveis.
  */
-export function Demonstrativo({ colunas, linhas }: { colunas: string[]; linhas: Linha[] }) {
+/** `destaque` é o índice da coluna (0 = Hoje) que fica realçada, como o ano escolhido no topo. */
+export function Demonstrativo({ colunas, linhas, destaque }: { colunas: string[]; linhas: Linha[]; destaque?: number }) {
   const [abertas, setAbertas] = useState<Set<string>>(new Set())
   const todas = (ls: Linha[]): string[] => ls.flatMap((l) => (l.filhos?.length ? [l.id, ...todas(l.filhos)] : []))
   const expandir = () => setAbertas(new Set(todas(linhas)))
@@ -501,7 +502,7 @@ export function Demonstrativo({ colunas, linhas }: { colunas: string[]; linhas: 
             )}
           </td>
           {l.valores.map((v, i) => (
-            <td key={i} className={`num${(v ?? 0) < 0 ? " negativo" : ""}`}>
+            <td key={i} className={`num${(v ?? 0) < 0 ? " negativo" : ""}${i === destaque ? " cap-col-destaque" : ""}`}>
               {formatar(l, v)}
             </td>
           ))}
@@ -522,7 +523,7 @@ export function Demonstrativo({ colunas, linhas }: { colunas: string[]; linhas: 
             <tr>
               <th />
               {colunas.map((c, i) => (
-                <th key={c} className={`num${i === 0 ? " cap-th-ar" : ""}`}>
+                <th key={c} className={`num${i === 0 ? " cap-th-ar" : ""}${i === destaque ? " cap-col-destaque" : ""}`}>
                   {c}
                 </th>
               ))}
