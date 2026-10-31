@@ -61,9 +61,4 @@ export async function* registrosCsv(stream: ReadableStream<Uint8Array>): AsyncGe
   }
 }
 
-/** "1.234,56" → 1234.56; vazio → 0. */
-export function numeroCsv(v: string | undefined): number {
-  if (!v) return 0
-  const n = Number(v.replace(/\./g, "").replace(",", "."))
-  return Number.isFinite(n) ? n : 0
-}
+export { numeroCsv } from "./numero"

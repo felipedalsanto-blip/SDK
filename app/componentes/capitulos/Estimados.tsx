@@ -1,5 +1,5 @@
 "use client"
-import type { ResumoEstimado } from "@/lib/estimados"
+import type { ResumoEstimado } from "@/lib/estimados-calculo"
 import { fmtBRL, fmtInt } from "../util"
 
 const NOMES = { ipi: "IPI", icms: "ICMS" } as const

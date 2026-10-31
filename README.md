@@ -134,3 +134,18 @@ Ao fim de Compras, um aviso mostra quanto do valor comprado está em itens sem N
 ## Totais por tipo (Compras e Vendas)
 
 Antes das tabelas por regime, Compras e Vendas abrem com o total por **produto, serviço, locação de bem imóvel e locação de bem móvel**, com as mesmas colunas das listas (valor, custo e impostos/créditos que expandem até o tributo), a participação no valor e a linha de total. A categoria vem do tipo de linha e do tipo de operação do cálculo (`lib/tipos.ts`); um tipo fora das quatro aparece com o próprio nome. Respeita o ano, o cenário de venda e a chave de tributos estimados.
+
+## Testes de regressão
+
+```bash
+npm test
+```
+
+São 40 testes (`node:test` + `tsx`) nas fórmulas puras, sem rede e sem chave:
+
+- **Precificador:** bases e gross-up de ICMS, ISS, PIS/COFINS (Tema 69), IPI, ICMS-ST com MVA ajustada, DIFAL de base única e de base dupla, cronograma da EC 132 e as duas metodologias. As fórmulas foram conferidas contra linhas reais da Pricetax (diferença de até R$ 0,02); os valores dos testes são sintéticos.
+- **DRE:** receita líquida, lucro bruto, IRPJ e CSLL no Lucro Real (com adicional), no Presumido (comércio e serviços) e no Simples.
+- **Tributos estimados:** o ajuste de uma linha com o estimado de volta ao preço.
+- **Qualidade da base e tipo de operação.**
+
+Os módulos puros ficam separados dos que dependem do servidor: `lib/precificacao-calculo.ts`, `lib/demonstrativos.ts`, `lib/estimados-calculo.ts`, `lib/qualidade.ts`, `lib/tipos.ts` e `lib/numero.ts`. A CI (`.github/workflows/ci.yml`) roda tipos, testes e build a cada push.
