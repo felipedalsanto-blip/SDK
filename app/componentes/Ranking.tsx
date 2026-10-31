@@ -72,7 +72,7 @@ export function Ranking({
       {erro != null && <Erro erro={erro} />}
       {!erro && !dados && <div className="vazio">Carregando…</div>}
       {dados && (
-        <div className={carregando ? "carregando" : undefined}>
+        <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
           {dados.grupos.length === 0 ? (
             <div className="vazio">Nenhum grupo neste recorte.</div>
           ) : (
@@ -197,7 +197,7 @@ function Barras({
         <summary className="sub" style={{ cursor: "pointer" }}>
           Ver como tabela
         </summary>
-        <div className="tabela-rolagem">
+        <div className="tabela-rolagem" tabIndex={0}>
           <table>
             <thead>
               <tr>

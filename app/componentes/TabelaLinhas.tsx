@@ -47,8 +47,8 @@ export function TabelaLinhas({ calculoId, selecao }: { calculoId: string; seleca
       {!erro && pagina && pagina.linhas.length === 0 && <div className="vazio">Nenhum item neste recorte.</div>}
       {!erro && !pagina && <div className="vazio">Carregando…</div>}
       {!erro && pagina && pagina.linhas.length > 0 && (
-        <div className={carregando ? "carregando" : undefined}>
-          <div className="tabela-rolagem">
+        <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
+          <div className="tabela-rolagem" tabIndex={0}>
             <table>
               <thead>
                 <tr>

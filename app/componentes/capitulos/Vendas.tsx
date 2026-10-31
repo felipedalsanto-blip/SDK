@@ -41,7 +41,7 @@ export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: st
 
   return (
     <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} semEstimados={semEstimados} sentido="saida" cenario={dados.cenario.id}>
-    <div className={carregando ? "carregando" : undefined}>
+    <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
       <Capitulo numero="02" titulo={`Vendas · ${dados.ano}`} sub={`Os caminhos de preço para ${dados.ano} e o que cada um faz com o resultado.`}>
         <Bloco titulo="Os cenários de preço" leitura="Escolha um cenário para ver as listas e os padrões logo abaixo.">
           <div className="cap-cenarios">
@@ -92,7 +92,7 @@ export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: st
             titulo={`Clientes e vendas por regime tributário · ${atual.rotulo}`}
             leitura="O regime do cliente decide quanto do IBS e da CBS ele recupera. Para quem é do regime regular, o tributo volta como crédito; para o Simples Nacional, em regra, vira custo."
           >
-            <div className="tabela-rolagem">
+            <div className="tabela-rolagem" tabIndex={0}>
               <table className="cap-tabela">
                 <thead>
                   <tr>
@@ -172,7 +172,7 @@ export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: st
           {dados.desvios.length === 0 ? (
             <p className="cap-vazio">Nenhum NCM com carga diferente entre destinos e regimes.</p>
           ) : (
-            <div className="tabela-rolagem">
+            <div className="tabela-rolagem" tabIndex={0}>
               <table className="cap-tabela">
                 <thead>
                   <tr>

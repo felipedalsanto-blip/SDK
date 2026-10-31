@@ -69,11 +69,13 @@ export function EstimadosAnos({ anos, excluidos }: { anos: PorAno[]; excluidos: 
         <span className="cap-selo-est">ESTIMADO</span>
         <b>{excluidos ? "Sem o efeito dos tributos estimados na cadeia" : "Os números incluem tributos estimados na cadeia"}</b>
       </div>
-      <div className="tabela-rolagem">
+      <div className="tabela-rolagem" tabIndex={0}>
         <table className="cap-tabela">
           <thead>
             <tr>
-              <th />
+              <th>
+                <span className="sr-only">Linha</span>
+              </th>
               <th className="num">Hoje (AR)</th>
               {anos.map((a) => (
                 <th key={a.ano} className="num">

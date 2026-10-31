@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useMemo, useState } from "react"
+import { cloneElement, useEffect, useMemo, useState } from "react"
 import type { Calculo, CalculoDetalhe } from "@pricetax/sdk"
 import {
   DIMENSOES_RANKING,
@@ -78,11 +78,14 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
 
   return (
     <>
+      <a className="pular-conteudo" href="#conteudo">
+        Pular para o conteúdo
+      </a>
       <header className="topo">
         <div className="marca">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-pricetax.png" alt="PriceTax" className="logo" />
-          <span>Diagnóstico da Reforma Tributária</span>
+          <h1>Diagnóstico da Reforma Tributária</h1>
         </div>
         <div className="topo-acoes">
         <Tema />
@@ -106,7 +109,7 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
         )}
         </div>
       </header>
-      <main>
+      <main id="conteudo">
         {!calculoId && <EscolherCalculo lista={lista} onEscolher={escolher} />}
         {calculoId && detalhe.erro != null && <Erro erro={detalhe.erro} />}
         {calculoId && detalhe.carregando && !detalhe.dados && <div className="cartao vazio">Carregando o cálculo…</div>}
@@ -365,11 +368,13 @@ const ABAS = {
 } as const
 type Aba = keyof typeof ABAS
 
-function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+/** Rótulo visível e, nos seletores, o mesmo nome para leitores de tela. */
+function Campo({ rotulo, children }: { rotulo: string; children: React.ReactElement<{ "aria-label"?: string }> }) {
+  const nomeado = children.type === "select" && !children.props["aria-label"] ? cloneElement(children, { "aria-label": rotulo }) : children
   return (
     <div className="campo">
-      <label>{rotulo}</label>
-      {children}
+      <span className="campo-rotulo">{rotulo}</span>
+      {nomeado}
     </div>
   )
 }
@@ -492,7 +497,7 @@ function Serie({
       </div>
       {erro != null && <Erro erro={erro} />}
       {!erro && (
-        <div className={carregando ? "carregando" : undefined}>
+        <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
           {dados ? (
             <GraficoSerie serie={dados.serie} medida={medida} anoAtual={anoAtual} onAno={onAno} />
           ) : (

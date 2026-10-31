@@ -92,7 +92,7 @@ export function CustoCliente({ base, porRegime, ano, calculoId }: { base: Record
         </div>
       </div>
 
-      <div className="tabela-rolagem">
+      <div className="tabela-rolagem" tabIndex={0}>
         <table className="cap-tabela cc-tabela">
           <thead>
             <tr>

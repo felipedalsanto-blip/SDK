@@ -194,7 +194,7 @@ export function TabelaParceiros({
   return (
     <>
       <SeletorGrupos grupos={grupos} niveis={niveis} setNiveis={setNiveis} />
-      <div className="tabela-rolagem">
+      <div className="tabela-rolagem" tabIndex={0}>
         <table className="cap-tabela">
           <thead>
             <tr>
@@ -291,7 +291,7 @@ export function TabelaTipos({
   return (
     <>
       <SeletorGrupos grupos={grupos} niveis={niveis} setNiveis={setNiveis} />
-      <div className="tabela-rolagem">
+      <div className="tabela-rolagem" tabIndex={0}>
         <table className="cap-tabela cap-tipos">
           <thead>
             <tr>
@@ -342,7 +342,7 @@ export function TabelaItens({
   return (
     <>
       <SeletorGrupos grupos={grupos} niveis={niveis} setNiveis={setNiveis} />
-      <div className="tabela-rolagem">
+      <div className="tabela-rolagem" tabIndex={0}>
         <table className="cap-tabela">
           <thead>
             <tr>
@@ -593,11 +593,13 @@ export function Demonstrativo({ colunas, linhas, destaque }: { colunas: string[]
           <BotoesExpandir onExpandir={expandir} onRecolher={recolher} />
         </div>
       )}
-      <div className="tabela-rolagem">
+      <div className="tabela-rolagem" tabIndex={0}>
         <table className="cap-tabela cap-demonstrativo">
           <thead>
             <tr>
-              <th />
+              <th>
+                <span className="sr-only">Linha</span>
+              </th>
               {colunas.map((c, i) => (
                 <th key={c} className={`num${i === 0 ? " cap-th-ar" : ""}${i === destaque ? " cap-col-destaque" : ""}`}>
                   {c}

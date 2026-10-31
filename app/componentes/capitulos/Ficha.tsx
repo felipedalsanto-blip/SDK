@@ -135,7 +135,7 @@ function ConteudoFicha({ calculoId, regime, ano, semEstimados, sentido, cenario,
 
       <section className="ficha-secao">
         <h3>Primeiras notas</h3>
-        <div className="tabela-rolagem">
+        <div className="tabela-rolagem" tabIndex={0}>
           <table className="cap-tabela">
             <thead>
               <tr>

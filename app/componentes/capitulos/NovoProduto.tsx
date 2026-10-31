@@ -432,7 +432,7 @@ function Simulador({
 
       <Bloco titulo="Total pago pelo cliente, ano a ano" leitura="O valor líquido fica igual; muda só o que vai para os tributos. A linha tracejada é o total de hoje.">
         <LinhasAno anos={d.anos} ar={hoje.total} series={[{ nome: "Total pago pelo cliente", cor: "var(--pt-amarelo)", valores: porAno.map((x) => x.total) }]} />
-        <div className="tabela-rolagem">
+        <div className="tabela-rolagem" tabIndex={0}>
           <table className="cap-tabela">
             <thead>
               <tr>
@@ -740,7 +740,7 @@ function CamposNota({ n, e }: { n: Nota; e: Entrada }) {
     ["Total pago pelo cliente (produto + despesas + IPI + ST + IBS + CBS)", "vNF", fmtBRL(n.total)],
   )
   return (
-    <div className="tabela-rolagem">
+    <div className="tabela-rolagem" tabIndex={0}>
       <table className="cap-tabela np-nota">
         <thead>
           <tr>
@@ -773,7 +773,7 @@ function CamposNota({ n, e }: { n: Nota; e: Entrada }) {
 function CustoPorPerfil({ base, ano }: { base: Record<string, number>; ano: number }) {
   const [aberto, setAberto] = useState<string | null>(null)
   return (
-    <div className="tabela-rolagem">
+    <div className="tabela-rolagem" tabIndex={0}>
       <table className="cap-tabela cc-tabela">
         <thead>
           <tr>

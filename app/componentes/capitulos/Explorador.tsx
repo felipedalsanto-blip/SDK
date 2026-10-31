@@ -205,7 +205,7 @@ export function Explorador({ calculoId, regime, ano, sentido, cenario }: Props) 
       {agrupar.length === 0 || colunas.length === 0 ? (
         <p className="cap-vazio">Escolha ao menos um agrupador e uma coluna.</p>
       ) : (
-        <div className={`tabela-rolagem${carregando ? " carregando" : ""}`}>
+        <div className={`tabela-rolagem${carregando ? " carregando" : ""}`} tabIndex={0} aria-busy={carregando}>
           <table className="cap-tabela">
             <thead>
               <tr>

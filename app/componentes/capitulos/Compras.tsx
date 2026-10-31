@@ -27,7 +27,7 @@ export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: s
 
   return (
     <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} semEstimados={semEstimados} sentido="entrada">
-    <div className={carregando ? "carregando" : undefined}>
+    <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
       <Capitulo
         numero="01"
         titulo={`Compras · ${dados.ano}`}
@@ -77,7 +77,7 @@ export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: s
           titulo="Compras por regime tributário do fornecedor"
           leitura="O regime do fornecedor define quanto crédito volta para a empresa. Fornecedor do Simples Nacional, em regra, gera menos crédito de IBS e CBS do que um do regime regular."
         >
-          <div className="tabela-rolagem">
+          <div className="tabela-rolagem" tabIndex={0}>
             <table className="cap-tabela">
               <thead>
                 <tr>
@@ -284,7 +284,7 @@ function AvisoQualidade({ q }: { q: Qualidade }) {
               </span>
               <p>{risco}</p>
               {aberto === chave && (
-                <div className="tabela-rolagem">
+                <div className="tabela-rolagem" tabIndex={0}>
                   <table className="cap-tabela">
                     <thead>
                       <tr>

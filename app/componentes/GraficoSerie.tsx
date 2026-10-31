@@ -188,7 +188,7 @@ export function GraficoSerie({
         <summary className="sub" style={{ cursor: "pointer" }}>
           Ver como tabela
         </summary>
-        <div className="tabela-rolagem">
+        <div className="tabela-rolagem" tabIndex={0}>
           <table>
             <thead>
               <tr>

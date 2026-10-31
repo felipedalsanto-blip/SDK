@@ -181,7 +181,7 @@ function MatrizCst({ celulas, nomes }: { celulas: CelulaCst[]; nomes: Record<str
       {celulas.length === 0 ? (
         <div className="vazio">Nenhum item neste recorte.</div>
       ) : (
-        <div className="tabela-rolagem">
+        <div className="tabela-rolagem" tabIndex={0}>
           <table className="matriz">
             <thead>
               <tr>
@@ -246,7 +246,7 @@ function Pares({ a }: { a: AnaliseClassificacao }) {
       {a.pares.length === 0 ? (
         <div className="vazio">Nenhuma divergência de cClassTrib neste recorte.</div>
       ) : (
-        <div className="tabela-rolagem" style={{ maxHeight: 460 }}>
+        <div className="tabela-rolagem" tabIndex={0} style={{ maxHeight: 460 }}>
           <table>
             <thead>
               <tr>
@@ -297,7 +297,7 @@ function Itens({ a }: { a: AnaliseClassificacao }) {
       {a.itens.length === 0 ? (
         <div className="vazio">Nenhum item divergente.</div>
       ) : (
-        <div className="tabela-rolagem">
+        <div className="tabela-rolagem" tabIndex={0}>
           <table>
             <thead>
               <tr>
@@ -346,7 +346,7 @@ function Fornecedores({ a }: { a: AnaliseClassificacao }) {
       ) : a.fornecedores.length === 0 ? (
         <div className="vazio">Nenhum fornecedor com divergência.</div>
       ) : (
-        <div className="tabela-rolagem">
+        <div className="tabela-rolagem" tabIndex={0}>
           <table>
             <thead>
               <tr>
@@ -549,7 +549,7 @@ function Projecao({ pontos, anoAtual, onAno }: { pontos: PontoProjecao[]; anoAtu
         <summary className="sub" style={{ cursor: "pointer" }}>
           Ver como tabela
         </summary>
-        <div className="tabela-rolagem">
+        <div className="tabela-rolagem" tabIndex={0}>
           <table>
             <thead>
               <tr>

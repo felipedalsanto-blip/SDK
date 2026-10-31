@@ -126,7 +126,7 @@ export function Dre({
   const lb = v("lb")
 
   return (
-    <div className={carregando ? "carregando" : undefined}>
+    <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
       <Capitulo numero="03" titulo="DRE · 2027 a 2033" sub="O efeito do IBS e da CBS na DRE, ano a ano, em cada cenário de preço.">
         <Bloco titulo="Como ler a DRE da reforma">
           <div className="cap-didatico">

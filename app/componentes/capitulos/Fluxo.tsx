@@ -44,7 +44,7 @@ export function Fluxo({
   const ar = (id: string, sinal = 1) => (v(id)[0] === null || v(id)[0] === undefined ? null : sinal * v(id)[0]!)
 
   return (
-    <div className={carregando ? "carregando" : undefined}>
+    <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
       <Capitulo numero="04" titulo="Fluxo de caixa · 2027 a 2033" sub="Quanto entra dos clientes, sai para fornecedores e vai para o governo, ano a ano.">
         <Bloco
           titulo="Fluxo de caixa operacional"
