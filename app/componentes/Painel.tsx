@@ -1,4 +1,20 @@
 "use client"
+import {
+  Download,
+  FileChartColumn,
+  LayoutDashboard,
+  ListChecks,
+  Monitor,
+  Moon,
+  PackagePlus,
+  ShoppingCart,
+  Sun,
+  TrendingUp,
+  Wallet,
+  X,
+  type LucideIcon,
+} from "lucide-react"
+import { Carregando } from "./capitulos/ui"
 import { cloneElement, useEffect, useMemo, useState } from "react"
 import type { Calculo, CalculoDetalhe } from "@pricetax/sdk"
 import {
@@ -42,12 +58,12 @@ function Tema() {
       else localStorage.setItem("pricetax-tema", m)
     } catch {}
   }
-  const opcoes: [Modo, string][] = [["light", "☀ Claro"], ["dark", "☾ Escuro"], ["sistema", "Sistema"]]
+  const opcoes: [Modo, string, LucideIcon][] = [["light", "Claro", Sun], ["dark", "Escuro", Moon], ["sistema", "Sistema", Monitor]]
   return (
     <div className="tema" role="group" aria-label="Tema">
-      {opcoes.map(([m, nome]) => (
+      {opcoes.map(([m, nome, Icone]) => (
         <button key={m} aria-pressed={modo === m} onClick={() => mudar(m)}>
-          {nome}
+          <Icone aria-hidden="true" size={13} /> {nome}
         </button>
       ))}
     </div>
@@ -112,7 +128,7 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
       <main id="conteudo">
         {!calculoId && <EscolherCalculo lista={lista} onEscolher={escolher} />}
         {calculoId && detalhe.erro != null && <Erro erro={detalhe.erro} />}
-        {calculoId && detalhe.carregando && !detalhe.dados && <div className="cartao vazio">Carregando o cálculo…</div>}
+        {calculoId && detalhe.carregando && !detalhe.dados && <Carregando mensagem="Carregando o cálculo…" />}
         {calculoId && detalhe.dados && <Visao key={detalhe.dados.id} calculo={detalhe.dados} />}
       </main>
     </>
@@ -224,7 +240,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
             </p>
           </div>
           <a className="botao" href={linkExportar(calculo.id, selecao)} download>
-            ⬇ Baixar CSV do recorte
+            <Download aria-hidden="true" size={15} /> Baixar CSV do recorte
           </a>
         </div>
         <div className="filtros">
@@ -302,7 +318,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
             <span className="chip">
               {DIMENSOES_RANKING[filtro.dimensao]}: {rotuloValor(filtro.dimensao, filtro.valor)}
               <button aria-label="Remover filtro" onClick={() => setFiltro(null)}>
-                ✕
+                <X aria-hidden="true" size={13} />
               </button>
             </span>
           )}
@@ -312,6 +328,10 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
       <nav className="abas" aria-label="Visões">
         {(Object.keys(ABAS) as Aba[]).map((a) => (
           <button key={a} aria-current={aba === a ? "page" : undefined} onClick={() => trocarAba(a)}>
+            {(() => {
+              const Icone = ICONES_ABA[a]
+              return <Icone aria-hidden="true" size={16} />
+            })()}
             {ABAS[a]}
           </button>
         ))}
@@ -367,6 +387,15 @@ const ABAS = {
   classificacao: "Classificação CST / cClassTrib",
 } as const
 type Aba = keyof typeof ABAS
+const ICONES_ABA: Record<Aba, LucideIcon> = {
+  compras: ShoppingCart,
+  vendas: TrendingUp,
+  dre: FileChartColumn,
+  fluxo: Wallet,
+  novo: PackagePlus,
+  geral: LayoutDashboard,
+  classificacao: ListChecks,
+}
 
 /** Rótulo visível e, nos seletores, o mesmo nome para leitores de tela. */
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactElement<{ "aria-label"?: string }> }) {

@@ -1,4 +1,5 @@
 "use client"
+import { Download } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import type { Exploracao } from "@/lib/explorar"
 import { AGRUPADORES, GRUPOS_COLUNAS, type Agrupador } from "@/lib/tributos"
@@ -193,7 +194,7 @@ export function Explorador({ calculoId, regime, ano, sentido, cenario }: Props) 
             {direcao === "desc" ? "Maior primeiro ▾" : "Menor primeiro ▴"}
           </button>
           <button className="cap-chip" onClick={baixarCsv} disabled={grupos.length === 0}>
-            ⬇ Baixar CSV
+            <Download aria-hidden="true" size={14} /> Baixar CSV
           </button>
           <span className="cap-sub">
             {grupos.length ? `${fmtInt(grupos.length)} de ${fmtInt(total)} linhas` : ""}

@@ -1,4 +1,5 @@
 "use client"
+import { Building2, Coins, PiggyBank, Receipt, ShoppingCart } from "lucide-react"
 import { useState } from "react"
 import type { Compras as Dados, Qualidade, Suspeitos } from "@/lib/capitulos"
 import { Erro } from "../comum"
@@ -6,7 +7,7 @@ import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { Explorador } from "./Explorador"
 import { AvisoEstimados } from "./Estimados"
 import { ProvedorFicha } from "./Ficha"
-import { Alternar, Bloco, Capitulo, Diferenca, Indicador, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros, TabelaTipos } from "./ui"
+import { Alternar, Bloco, Capitulo, Carregando, Diferenca, Indicador, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros, TabelaTipos } from "./ui"
 
 type Sentido = "aumento" | "reducao"
 const SENTIDOS: Record<Sentido, string> = { aumento: "Quem aumenta", reducao: "Quem reduz" }
@@ -20,7 +21,7 @@ export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: s
   const [pareto, setPareto] = useState<"fornecedor" | "ncm" | "grupo">("fornecedor")
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="cartao vazio">Lendo as compras de {ano}…</div>
+  if (!dados) return <Carregando mensagem={`Lendo as compras de ${ano}…`} />
   const t = dados.totais
   const sobe = sentido === "aumento"
   const p = dados.pareto
@@ -30,12 +31,14 @@ export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: s
     <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
       <Capitulo
         numero="01"
+        icone={ShoppingCart}
         titulo={`Compras · ${dados.ano}`}
         sub={`${dados.ano === 2027 ? "O ano das ações. " : ""}Cenário de compras ${dados.cenario}: o fornecedor tira os tributos atuais do preço e soma o IBS e a CBS.`}
       >
         <div className="cap-kpis">
-          <Indicador rotulo="Fornecedores" valor={fmtInt(t.fornecedores)} contexto={`${fmtInt(t.itens)} itens de compra`} />
+          <Indicador icone={Building2} rotulo="Fornecedores" valor={fmtInt(t.fornecedores)} contexto={`${fmtInt(t.itens)} itens de compra`} />
           <Indicador
+            icone={Receipt}
             rotulo="Valor das compras"
             valor={fmtBRL(t.valorDr)}
             contexto={
@@ -45,6 +48,7 @@ export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: s
             }
           />
           <Indicador
+            icone={Coins}
             rotulo="Custo efetivo"
             valor={fmtBRL(t.custoDr)}
             contexto={
@@ -54,6 +58,7 @@ export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: s
             }
           />
           <Indicador
+            icone={PiggyBank}
             rotulo="Crédito recuperável"
             valor={fmtBRL(t.creditoDr)}
             contexto={

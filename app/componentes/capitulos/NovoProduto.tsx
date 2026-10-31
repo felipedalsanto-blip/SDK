@@ -1,4 +1,5 @@
 "use client"
+import { Banknote, Calculator, PackagePlus, Receipt, Scale } from "lucide-react"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { CCLASS, CST, fator } from "@/lib/cclass"
 import type { Classificacao, Opcao } from "@/lib/receita"
@@ -20,7 +21,7 @@ import {
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { PERFIS, Resumo, custo } from "./CustoCliente"
-import { Alternar, Bloco, Capitulo, Diferenca, Indicador, LinhasAno, Premissa } from "./ui"
+import { Alternar, Bloco, Capitulo, Carregando, Diferenca, Indicador, LinhasAno, Premissa } from "./ui"
 
 const TIPOS: Record<Tipo, string> = { produto: "Produto", servico: "Serviço", locacao: "Locação" }
 const NOME_ATUAL: Record<Atual, string> = { icms: "ICMS", iss: "ISS", pis_cofins: "PIS/COFINS", ipi: "IPI" }
@@ -108,7 +109,7 @@ export function NovoProduto({ calculoId, regime, ano }: { calculoId: string; reg
     })
 
   if (erro) return <Erro erro={erro} />
-  if (!dados || !e) return <div className="cartao vazio">Lendo as alíquotas das suas vendas, ano a ano…</div>
+  if (!dados || !e) return <Carregando mensagem="Lendo as alíquotas das suas vendas, ano a ano…" />
   return <Simulador d={dados} e={e} mudar={mudar} regime={regime} reiniciar={() => mudar(padrao(dados))} />
 }
 
@@ -184,6 +185,7 @@ function Simulador({
   return (
     <Capitulo
       numero="05"
+      icone={PackagePlus}
       titulo="Novo produto · formação de preço"
       sub="Do valor líquido até a nota fiscal: margem, tributos de hoje, IBS e CBS, para um produto, serviço ou locação que ainda não está no histórico."
     >
@@ -405,10 +407,11 @@ function Simulador({
       </Bloco>
 
       <div className="cap-kpis">
-        <Indicador rotulo="Valor líquido" valor={fmtBRL(liquido)} contexto="o que a empresa recebe livre de tributos" />
-        <Indicador rotulo="Cliente paga hoje (AR)" valor={fmtBRL(hoje.total)} contexto={`tributos ${fmtPct(hoje.total ? (hoje.total - liquido) / hoje.total : 0)} do total`} />
-        <Indicador rotulo={`Cliente paga em ${e.ano}`} valor={fmtBRL(nota.total)} contexto={`tributos ${fmtPct(nota.total ? (nota.total - liquido) / nota.total : 0)} do total`} />
+        <Indicador icone={Banknote} rotulo="Valor líquido" valor={fmtBRL(liquido)} contexto="o que a empresa recebe livre de tributos" />
+        <Indicador icone={Receipt} rotulo="Cliente paga hoje (AR)" valor={fmtBRL(hoje.total)} contexto={`tributos ${fmtPct(hoje.total ? (hoje.total - liquido) / hoje.total : 0)} do total`} />
+        <Indicador icone={Calculator} rotulo={`Cliente paga em ${e.ano}`} valor={fmtBRL(nota.total)} contexto={`tributos ${fmtPct(nota.total ? (nota.total - liquido) / nota.total : 0)} do total`} />
         <Indicador
+          icone={Scale}
           rotulo="Diferença para o cliente"
           valor={fmtBRL(nota.total - hoje.total)}
           contexto={<>{hoje.total ? fmtPct((nota.total - hoje.total) / hoje.total) : ""} para manter o mesmo valor líquido</>}

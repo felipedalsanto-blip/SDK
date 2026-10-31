@@ -1,4 +1,5 @@
 "use client"
+import { Wallet } from "lucide-react"
 import { useState } from "react"
 import type { Estorno } from "@/lib/capitulos"
 import { acharLinha, montarFluxo } from "@/lib/demonstrativos"
@@ -7,7 +8,7 @@ import { api, fmtBRL, fmtPct, useBusca } from "../util"
 import type { Trilha } from "@/lib/capitulos"
 import { FormPremissas, porCenario, usePremissasIr, useTrilha } from "./Dre"
 import { EstimadosAnos } from "./Estimados"
-import { Alternar, Bloco, COR_CENARIO, Capitulo, Demonstrativo, Indicador, LinhasAno, Premissa } from "./ui"
+import { Alternar, Bloco, Capitulo, Carregando, COR_CENARIO, Demonstrativo, Indicador, LinhasAno, Premissa } from "./ui"
 
 export function Fluxo({
   calculoId,
@@ -28,7 +29,7 @@ export function Fluxo({
   const [cenario, setCenario] = useState<string | null>(null)
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="cartao vazio">Montando o fluxo de caixa de 2027 a 2033…</div>
+  if (!dados) return <Carregando mensagem="Montando o fluxo de caixa de 2027 a 2033…" />
 
   const anos = dados.anos
   const escolhido = dados.cenarios.find((c) => c.id === cenario) ?? dados.cenarios.find((c) => c.rotulo === "Com Reajuste") ?? dados.cenarios[0]
@@ -45,7 +46,7 @@ export function Fluxo({
 
   return (
     <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
-      <Capitulo numero="04" titulo="Fluxo de caixa · 2027 a 2033" sub="Quanto entra dos clientes, sai para fornecedores e vai para o governo, ano a ano.">
+      <Capitulo numero="04" icone={Wallet} titulo="Fluxo de caixa · 2027 a 2033" sub="Quanto entra dos clientes, sai para fornecedores e vai para o governo, ano a ano.">
         <Bloco
           titulo="Fluxo de caixa operacional"
           leitura="No formato que o financeiro usa: entradas positivas, saídas negativas. Clique numa linha com ▸ para abrir até o tributo."

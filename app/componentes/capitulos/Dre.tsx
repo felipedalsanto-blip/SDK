@@ -1,11 +1,12 @@
 "use client"
+import { FileChartColumn } from "lucide-react"
 import { useEffect, useState } from "react"
 import type { Trilha } from "@/lib/capitulos"
 import { acharLinha, montarDre, type Linha, type PremissasIr } from "@/lib/demonstrativos"
 import { Erro } from "../comum"
 import { api, fmtBRL, fmtPct, useBusca } from "../util"
 import { EstimadosAnos } from "./Estimados"
-import { Alternar, Bloco, COR_CENARIO, Capitulo, Demonstrativo, Diferenca, Indicador, LinhasAno, Premissa } from "./ui"
+import { Alternar, Bloco, Capitulo, Carregando, COR_CENARIO, Demonstrativo, Diferenca, Indicador, LinhasAno, Premissa } from "./ui"
 
 export function useTrilha(calculoId: string, regime: string, semEstimados: boolean) {
   return useBusca((s) => api<Trilha>(`/api/calculos/${calculoId}/capitulos/trilha`, { regime, semEstimados }, s), [calculoId, regime, semEstimados])
@@ -103,7 +104,7 @@ export function Dre({
   const [cenario, setCenario] = useState<string | null>(null)
   const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="cartao vazio">Montando a DRE de 2027 a 2033 em todos os cenários…</div>
+  if (!dados) return <Carregando mensagem="Montando a DRE de 2027 a 2033 em todos os cenários…" />
 
   const anos = dados.anos
   const escolhido = dados.cenarios.find((c) => c.id === cenario) ?? dados.cenarios.find((c) => c.rotulo === "Com Reajuste") ?? dados.cenarios[0]
@@ -127,7 +128,7 @@ export function Dre({
 
   return (
     <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
-      <Capitulo numero="03" titulo="DRE · 2027 a 2033" sub="O efeito do IBS e da CBS na DRE, ano a ano, em cada cenário de preço.">
+      <Capitulo numero="03" icone={FileChartColumn} titulo="DRE · 2027 a 2033" sub="O efeito do IBS e da CBS na DRE, ano a ano, em cada cenário de preço.">
         <Bloco titulo="Como ler a DRE da reforma">
           <div className="cap-didatico">
             <div>

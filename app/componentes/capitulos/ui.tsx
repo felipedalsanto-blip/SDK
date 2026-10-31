@@ -1,5 +1,6 @@
 "use client"
 import { createContext, Fragment, useContext, useEffect, useState } from "react"
+import { ArrowDownRight, ArrowUpRight, ChevronsDownUp, ChevronsUpDown, Minus, type LucideIcon } from "lucide-react"
 import type { Item, Pareto as DadosPareto, Parceiro, PorTipo } from "@/lib/capitulos"
 import type { Linha } from "@/lib/demonstrativos"
 import { TRIBUTOS } from "@/lib/tributos"
@@ -35,20 +36,39 @@ function useComando(aplicar: (nivel: 0 | 2) => void) {
 export function BotoesExpandir({ onExpandir, onRecolher }: { onExpandir: () => void; onRecolher: () => void }) {
   return (
     <span className="cap-expandir">
-      <button onClick={onExpandir}>⊞ Expandir tudo</button>
-      <button onClick={onRecolher}>⊟ Recolher tudo</button>
+      <button onClick={onExpandir}>
+        <ChevronsUpDown aria-hidden="true" size={14} /> Expandir tudo
+      </button>
+      <button onClick={onRecolher}>
+        <ChevronsDownUp aria-hidden="true" size={14} /> Recolher tudo
+      </button>
     </span>
   )
 }
 
-export function Capitulo({ numero, titulo, sub, children }: { numero: string; titulo: string; sub: string; children: React.ReactNode }) {
+export function Capitulo({
+  numero,
+  titulo,
+  sub,
+  icone: Icone,
+  children,
+}: {
+  numero: string
+  titulo: string
+  sub: string
+  icone?: LucideIcon
+  children: React.ReactNode
+}) {
   const [comando, setComando] = useState<Comando>({ nivel: 0, seq: 0 })
   const enviar = (nivel: 0 | 2) => setComando((c) => ({ nivel, seq: c.seq + 1 }))
   return (
     <ExpandirCtx.Provider value={{ comando, enviar }}>
       <section className="cap">
         <header className="cap-cabeca">
-          <span className="cap-numero">{numero}</span>
+          <span className="cap-numero">
+            {Icone && <Icone aria-hidden="true" size={22} strokeWidth={2.2} />}
+            {numero}
+          </span>
           <div style={{ flex: 1 }}>
             <h2>{titulo}</h2>
             <p>{sub}</p>
@@ -63,6 +83,30 @@ export function Capitulo({ numero, titulo, sub, children }: { numero: string; ti
   )
 }
 
+/** Esqueleto enquanto os dados chegam: a forma da tela, com a mensagem do que está sendo lido. */
+export function Carregando({ mensagem, indicadores = 4 }: { mensagem: string; indicadores?: number }) {
+  return (
+    <div className="esqueleto" role="status" aria-live="polite">
+      <div className="esqueleto-cabeca" />
+      <div className="esqueleto-kpis">
+        {Array.from({ length: indicadores }, (_, i) => (
+          <div key={i} className="esqueleto-kpi">
+            <span />
+            <span />
+            <span />
+          </div>
+        ))}
+      </div>
+      <div className="esqueleto-bloco">
+        {Array.from({ length: 6 }, (_, i) => (
+          <span key={i} style={{ width: `${92 - i * 9}%` }} />
+        ))}
+      </div>
+      <p className="esqueleto-mensagem">{mensagem}</p>
+    </div>
+  )
+}
+
 export function Bloco({ titulo, leitura, children }: { titulo: string; leitura?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="cap-bloco">
@@ -73,10 +117,17 @@ export function Bloco({ titulo, leitura, children }: { titulo: string; leitura?:
   )
 }
 
-export function Indicador({ rotulo, valor, contexto }: { rotulo: string; valor: string; contexto?: React.ReactNode }) {
+export function Indicador({ rotulo, valor, contexto, icone: Icone }: { rotulo: string; valor: string; contexto?: React.ReactNode; icone?: LucideIcon }) {
   return (
     <div className="cap-kpi">
-      <span className="cap-kpi-rotulo">{rotulo}</span>
+      <span className="cap-kpi-rotulo">
+        {Icone && (
+          <span className="cap-kpi-icone" aria-hidden="true">
+            <Icone size={15} strokeWidth={2.2} />
+          </span>
+        )}
+        {rotulo}
+      </span>
       <span className="cap-kpi-valor">{valor}</span>
       {contexto && <span className="cap-kpi-contexto">{contexto}</span>}
     </div>
@@ -86,10 +137,17 @@ export function Indicador({ rotulo, valor, contexto }: { rotulo: string; valor: 
 /** Variação com seta: ▲ sobe, ▼ cai. */
 export function Seta({ antes, depois }: { antes: number; depois: number }) {
   const v = variacao(antes, depois)
-  if (v === null || Math.abs(depois - antes) < 0.005) return <span className="cap-seta">sem mudança</span>
+  if (v === null || Math.abs(depois - antes) < 0.005)
+    return (
+      <span className="cap-seta">
+        <Minus aria-hidden="true" size={12} /> sem mudança
+      </span>
+    )
+  const Icone = v > 0 ? ArrowUpRight : ArrowDownRight
   return (
     <span className={`cap-seta ${v > 0 ? "sobe" : "cai"}`}>
-      {v > 0 ? "▲" : "▼"} {fmtPct(Math.abs(v))}
+      <Icone aria-hidden="true" size={13} strokeWidth={2.5} />
+      <span className="sr-only">{v > 0 ? "sobe" : "cai"}</span> {fmtPct(Math.abs(v))}
     </span>
   )
 }

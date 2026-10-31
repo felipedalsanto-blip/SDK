@@ -1,4 +1,5 @@
 "use client"
+import { TrendingUp } from "lucide-react"
 import { useState } from "react"
 import type { Vendas as Dados } from "@/lib/capitulos"
 import { Erro } from "../comum"
@@ -7,7 +8,7 @@ import { CustoCliente } from "./CustoCliente"
 import { Explorador } from "./Explorador"
 import { AvisoEstimados } from "./Estimados"
 import { ProvedorFicha } from "./Ficha"
-import { Alternar, Bloco, COR_CENARIO, Capitulo, Diferenca, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros, TabelaTipos } from "./ui"
+import { Alternar, Bloco, Capitulo, Carregando, COR_CENARIO, Diferenca, Pareto, Plano, Premissa, Seta, TabelaItens, TabelaParceiros, TabelaTipos } from "./ui"
 
 type Sentido = "aumento" | "reducao"
 const TOPS = { "10": "Top 10", "20": "Top 20", "30": "Top 30", "40": "Top 40", "50": "Top 50" }
@@ -34,7 +35,7 @@ export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: st
   )
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <div className="cartao vazio">Lendo as vendas de {ano} em todos os cenários…</div>
+  if (!dados) return <Carregando mensagem={`Lendo as vendas de ${ano} em todos os cenários…`} />
   const atual = dados.cenarios.find((c) => c.id === dados.cenario.id) ?? dados.cenarios[0]
   const sobe = sentido === "aumento"
   const p = dados.pareto
@@ -42,7 +43,7 @@ export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: st
   return (
     <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} semEstimados={semEstimados} sentido="saida" cenario={dados.cenario.id}>
     <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
-      <Capitulo numero="02" titulo={`Vendas · ${dados.ano}`} sub={`Os caminhos de preço para ${dados.ano} e o que cada um faz com o resultado.`}>
+      <Capitulo numero="02" icone={TrendingUp} titulo={`Vendas · ${dados.ano}`} sub={`Os caminhos de preço para ${dados.ano} e o que cada um faz com o resultado.`}>
         <Bloco titulo="Os cenários de preço" leitura="Escolha um cenário para ver as listas e os padrões logo abaixo.">
           <div className="cap-cenarios">
             {dados.cenarios.map((c) => (

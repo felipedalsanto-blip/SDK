@@ -1,4 +1,5 @@
 "use client"
+import { ArrowLeft, X } from "lucide-react"
 import { EstimadosFicha } from "./Estimados"
 import { useEffect, useState } from "react"
 import type { Ficha as Dados, Memoria as DadosMemoria } from "@/lib/capitulos"
@@ -64,9 +65,13 @@ export function ProvedorFicha({
                 ))}
               </nav>
               <span className="ficha-botoes">
-                {pilha.length > 1 && <button onClick={() => setPilha((p) => p.slice(0, -1))}>← Voltar</button>}
+                {pilha.length > 1 && (
+                  <button onClick={() => setPilha((p) => p.slice(0, -1))}>
+                    <ArrowLeft aria-hidden="true" size={14} /> Voltar
+                  </button>
+                )}
                 <button onClick={fechar} aria-label="Fechar">
-                  ✕
+                  <X aria-hidden="true" size={16} />
                 </button>
               </span>
             </header>
