@@ -1,5 +1,5 @@
 import "server-only" // falha o build se este arquivo for importado num Client Component
-import { PriceTax, PriceTaxErro, type CalculoDetalhe, type Filtros, type Recorte } from "@pricetax/sdk"
+import { PriceTax, PriceTaxErro, type Calculo, type CalculoDetalhe, type Filtros, type Recorte } from "@pricetax/sdk"
 import { DIMENSOES_RANKING, SENTIDOS, type Sentido } from "./catalogo"
 
 /** Erro do próprio painel (validação), com o mesmo formato de resposta dos erros da API. */
@@ -13,18 +13,80 @@ export class ErroDoPainel extends Error {
   }
 }
 
-let cliente: PriceTax | null = null
+/**
+ * As chaves de API do servidor. Aceita mais de uma conta PriceTax ao mesmo tempo:
+ * PRICETAX_API_KEY, PRICETAX_API_KEY_2, PRICETAX_API_KEY_3… (ou PRICETAX_API_KEYS separadas por vírgula).
+ */
+function chavesDoAmbiente(): string[] {
+  const numeradas = Object.keys(process.env)
+    .filter((k) => /^PRICETAX_API_KEY_\d+$/.test(k))
+    .sort((a, b) => Number(a.split("_").pop()) - Number(b.split("_").pop()))
+    .map((k) => process.env[k])
+  const lista = [process.env.PRICETAX_API_KEY, ...numeradas, ...(process.env.PRICETAX_API_KEYS ?? "").split(/[\s,;]+/)]
+  return [...new Set(lista.map((c) => c?.trim()).filter((c): c is string => !!c))]
+}
 
-/** Cliente com a chave de API. Criado na primeira chamada, para o build não depender da chave. */
-export function pricetax(): PriceTax {
-  if (!cliente) {
-    const apiKey = process.env.PRICETAX_API_KEY
-    if (!apiKey) {
+let clientes: PriceTax[] | null = null
+/** De qual cliente (conta) é cada cálculo, aprendido ao listar. */
+const dono = new Map<string, PriceTax>()
+
+function todosOsClientes(): PriceTax[] {
+  if (!clientes) {
+    const chaves = chavesDoAmbiente()
+    if (!chaves.length) {
       throw new ErroDoPainel(500, "sem_chave", "PRICETAX_API_KEY não está definida no .env do servidor.")
     }
-    cliente = new PriceTax({ apiKey, ...(process.env.PRICETAX_BASE_URL ? { baseUrl: process.env.PRICETAX_BASE_URL } : {}) })
+    const baseUrl = process.env.PRICETAX_BASE_URL
+    clientes = chaves.map((apiKey) => new PriceTax({ apiKey, ...(baseUrl ? { baseUrl } : {}) }))
   }
-  return cliente
+  return clientes
+}
+
+/** Lista os cálculos de todas as contas, do mais novo para o mais antigo. Uma conta fora do ar não derruba as outras. */
+async function listarTodos(): Promise<{ calculos: Calculo[] }> {
+  const cs = todosOsClientes()
+  const respostas = await Promise.allSettled(cs.map((c) => c.calculos.listar()))
+  const calculos: Calculo[] = []
+  respostas.forEach((r, i) => {
+    if (r.status !== "fulfilled") return
+    for (const calc of r.value.calculos) {
+      if (dono.has(calc.id) && dono.get(calc.id) !== cs[i]) continue
+      dono.set(calc.id, cs[i])
+      calculos.push(calc)
+    }
+  })
+  const falha = respostas.find((r): r is PromiseRejectedResult => r.status === "rejected")
+  if (!calculos.length && falha) throw falha.reason
+  calculos.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
+  return { calculos }
+}
+
+/** O cliente da conta dona do cálculo. Com uma chave só, é sempre ela. */
+async function clienteDe(id: string): Promise<PriceTax> {
+  const cs = todosOsClientes()
+  if (cs.length === 1) return cs[0]
+  if (!dono.has(id)) await listarTodos()
+  const c = dono.get(id)
+  if (!c) throw new ErroDoPainel(404, "calculo_nao_encontrado", "Este cálculo não pertence a nenhuma das chaves configuradas no servidor.")
+  return c
+}
+
+type Calculos = PriceTax["calculos"]
+
+/**
+ * Cliente da API. Com várias chaves, cada chamada vai para a conta dona do cálculo; a lista junta todas.
+ * Criado na primeira chamada, para o build não depender da chave.
+ */
+export function pricetax(): { calculos: Pick<Calculos, "listar" | "obter" | "consultar" | "pagina" | "exportar"> } {
+  return {
+    calculos: {
+      listar: listarTodos,
+      obter: async (id) => (await clienteDe(id)).calculos.obter(id),
+      consultar: async (id, entrada) => (await clienteDe(id)).calculos.consultar(id, entrada),
+      pagina: async (id, entrada) => (await clienteDe(id)).calculos.pagina(id, entrada),
+      exportar: async (id, selecao) => (await clienteDe(id)).calculos.exportar(id, selecao),
+    },
+  }
 }
 
 // Cache em memória no servidor: poupa o limite de 60 chamadas/min por chave.
