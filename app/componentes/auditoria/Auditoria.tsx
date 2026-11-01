@@ -132,7 +132,7 @@ export function Auditoria() {
 
   return (
     <Capitulo
-      numero="06"
+      numero="08"
       icone={ShieldCheck}
       titulo="Auditoria de entrada · EFD"
       sub="Conhecer a empresa, validar os arquivos recebidos e saber o que ainda falta pedir. Os EFDs são lidos neste navegador: nada é enviado a servidor."

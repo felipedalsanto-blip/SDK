@@ -1,18 +1,9 @@
 "use client"
 import {
   Download,
-  FileChartColumn,
-  LayoutDashboard,
-  Scale,
   Monitor,
   Moon,
-  PackagePlus,
-  ShieldCheck,
-  ShoppingCart,
   Sun,
-  TrendingUp,
-  Trophy,
-  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react"
@@ -23,12 +14,11 @@ import dynamic from "next/dynamic"
 const Auditoria = dynamic(() => import("./auditoria/Auditoria").then((m) => m.Auditoria), {
   loading: () => <Carregando mensagem="Abrindo a auditoria…" indicadores={2} />,
 })
-import { cloneElement, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { Calculo, CalculoDetalhe } from "@pricetax/sdk"
 import {
   DIMENSOES_RANKING,
   REGIMES,
-  SENTIDOS,
   type Selecao,
   type Sentido,
 } from "@/lib/catalogo"
@@ -40,6 +30,7 @@ import { VisaoClassificacao } from "./VisaoClassificacao"
 import { Compras } from "./capitulos/Compras"
 import { Dre } from "./capitulos/Dre"
 import { MelhorRegime } from "./capitulos/Regime"
+import { ABAS, BarraContexto, MenuLateral, type Aba } from "./Navegacao"
 import { Fluxo } from "./capitulos/Fluxo"
 import { NovoProduto } from "./capitulos/NovoProduto"
 import { Vendas } from "./capitulos/Vendas"
@@ -101,6 +92,20 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
     [calculoId],
   )
 
+  const avisos = lista.dados?.contas
+    ?.filter((c) => c.erro)
+    .map((c) => (
+      <div key={c.conta} className="aviso" role="alert">
+        A chave da conta {c.conta} ({c.conta === 1 ? "PRICETAX_API_KEY" : `PRICETAX_API_KEY_${c.conta}`}) não respondeu: {c.erro?.replace(/\.$/, "")}. Os cálculos
+        dela não aparecem na lista.
+      </div>
+    ))
+
+  // Com o cálculo carregado, a tela inteira é a do painel (menu lateral + barra de contexto).
+  if (calculoId && detalhe.dados) {
+    return <Visao key={detalhe.dados.id} calculo={detalhe.dados} calculos={lista.dados?.calculos ?? null} onCalculo={escolher} avisos={avisos} />
+  }
+
   return (
     <>
       <a className="pular-conteudo" href="#conteudo">
@@ -136,18 +141,9 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
       </header>
       <main id="conteudo">
         {!calculoId && <EscolherCalculo lista={lista} onEscolher={escolher} />}
-        {calculoId &&
-          lista.dados?.contas
-            ?.filter((c) => c.erro)
-            .map((c) => (
-              <div key={c.conta} className="aviso" role="alert" style={{ marginBottom: 12 }}>
-                A chave da conta {c.conta} ({c.conta === 1 ? "PRICETAX_API_KEY" : `PRICETAX_API_KEY_${c.conta}`}) não respondeu: {c.erro?.replace(/\.$/, "")}. Os cálculos
-                dela não aparecem na lista.
-              </div>
-            ))}
+        {calculoId && avisos}
         {calculoId && detalhe.erro != null && <Erro erro={detalhe.erro} />}
         {calculoId && detalhe.carregando && !detalhe.dados && <Carregando mensagem="Carregando o cálculo…" />}
-        {calculoId && detalhe.dados && <Visao key={detalhe.dados.id} calculo={detalhe.dados} />}
       </main>
     </>
   )
@@ -201,35 +197,79 @@ function EscolherCalculo({
   )
 }
 
-function Visao({ calculo }: { calculo: CalculoDetalhe }) {
+const lerUrl = (k: string) => (typeof window === "undefined" ? null : new URL(window.location.href).searchParams.get(k))
+
+function Visao({
+  calculo,
+  calculos,
+  onCalculo,
+  avisos,
+}: {
+  calculo: CalculoDetalhe
+  calculos: Calculo[] | null
+  onCalculo: (id: string | null) => void
+  avisos?: React.ReactNode
+}) {
   const anos = useMemo(() => [...calculo.anos].sort((a, b) => a - b), [calculo.anos])
   const regimeInicial =
     calculo.regime_tributario && calculo.regimes.includes(calculo.regime_tributario)
       ? calculo.regime_tributario
       : calculo.regimes[0]
   const cenarioInicial = calculo.cenarios.some((c) => c.id === "base") ? "base" : calculo.cenarios[0]?.id
+  const temCenario = (c: string | null) => (c && calculo.cenarios.some((x) => x.id === c) ? c : null)
 
-  const [regime, setRegime] = useState(regimeInicial)
-  const [ano, setAno] = useState(anos.includes(2027) ? 2027 : anos[0])
-  const [cenarioVendas, setCenarioVendas] = useState(cenarioInicial)
-  const [cenarioCompras, setCenarioCompras] = useState(cenarioInicial)
-  const [sentido, setSentido] = useState<Sentido>("ambas")
+  // Aba e filtros vêm da URL (para o link desta visão abrir igual) ou dos padrões do cálculo.
+  const [regime, setRegime] = useState(() => (calculo.regimes.includes(lerUrl("regime") ?? "") ? lerUrl("regime")! : regimeInicial))
+  const [ano, setAno] = useState(() => {
+    const a = Number(lerUrl("ano"))
+    return anos.includes(a) ? a : anos.includes(2027) ? 2027 : anos[0]
+  })
+  const [cenarioVendas, setCenarioVendas] = useState(() => temCenario(lerUrl("cv")) ?? cenarioInicial)
+  const [cenarioCompras, setCenarioCompras] = useState(() => temCenario(lerUrl("cc")) ?? cenarioInicial)
+  const [sentido, setSentido] = useState<Sentido>(() => {
+    const n = lerUrl("notas")
+    return n === "saida" || n === "entrada" ? n : "ambas"
+  })
   const [filtro, setFiltro] = useState<Selecao["filtro"]>(null)
-  const [aba, setAba] = useState<Aba>("compras")
+  const [aba, setAba] = useState<Aba>(() => {
+    const v = lerUrl("visao")
+    return v && v in ABAS ? (v as Aba) : "geral"
+  })
   // IPI e ICMS estimados na cadeia (não vieram no documento): dentro ou fora dos números.
-  const [semEstimados, setSemEstimados] = useState(false)
-
-  // A aba fica na URL (?visao=classificacao) para dar para compartilhar o link.
+  const [semEstimados, setSemEstimados] = useState(() => lerUrl("est") === "0")
+  const [menuAberto, setMenuAberto] = useState(false)
+  const [recolhido, setRecolhido] = useState(false)
   useEffect(() => {
-    const visao = new URL(window.location.href).searchParams.get("visao")
-    if (visao && visao in ABAS) setAba(visao as Aba)
+    try {
+      setRecolhido(localStorage.getItem("pricetax-menu") === "recolhido")
+    } catch {}
   }, [])
-  function trocarAba(nova: Aba) {
+  const recolher = () => {
+    setRecolhido((r) => {
+      try {
+        localStorage.setItem("pricetax-menu", r ? "aberto" : "recolhido")
+      } catch {}
+      return !r
+    })
+  }
+  const fecharMenu = useCallback(() => setMenuAberto(false), [])
+
+  // Tudo o que define a visão fica na URL; "Copiar link" copia esse endereço.
+  useEffect(() => {
     const url = new URL(window.location.href)
-    if (nova === "compras") url.searchParams.delete("visao")
-    else url.searchParams.set("visao", nova)
+    const def = (k: string, v: string | null, padrao: string | null) => (v === null || v === padrao ? url.searchParams.delete(k) : url.searchParams.set(k, v))
+    def("visao", aba, "geral")
+    def("ano", String(ano), String(anos.includes(2027) ? 2027 : anos[0]))
+    def("regime", regime ?? null, regimeInicial ?? null)
+    def("cv", cenarioVendas ?? null, cenarioInicial ?? null)
+    def("cc", cenarioCompras ?? null, cenarioInicial ?? null)
+    def("notas", sentido, "ambas")
+    def("est", semEstimados ? "0" : "1", "1")
     window.history.replaceState(null, "", url)
+  }, [aba, ano, regime, cenarioVendas, cenarioCompras, sentido, semEstimados, anos, regimeInicial, cenarioInicial])
+  function trocarAba(nova: Aba) {
     setAba(nova)
+    window.scrollTo({ top: 0 })
   }
 
   // Pré-carga: depois da aba aberta, as outras vão sendo lidas em segundo plano (uma por vez), para a
@@ -269,129 +309,52 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
 
 
   return (
-    <>
-      {calculo.processando && (
-        <div className="aviso">Este cálculo está sendo refeito no app. Os números podem mudar quando terminar.</div>
-      )}
-
-      <section className="cartao">
-        <div className="cabeca">
-          <div>
-            <h2>{calculo.nome}</h2>
-            <p className="sub">
-              {[
-                calculo.empresa,
-                calculo.cnpj && fmtCnpj(calculo.cnpj),
-                calculo.regime_tributario && `Regime atual: ${REGIMES[calculo.regime_tributario]}`,
-                calculo.periodo_meses && `${calculo.periodo_meses} meses analisados`,
-                `${fmtInt(calculo.total_linhas)} linhas`,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          </div>
-          <a className="botao" href={linkExportar(calculo.id, selecao)} download>
-            <Download aria-hidden="true" size={15} /> Baixar CSV do recorte
-          </a>
-        </div>
-        <div className="filtros">
-          <Campo rotulo="Regime simulado">
-            <select value={regime} onChange={(e) => setRegime(e.target.value)}>
-              {calculo.regimes.map((r) => (
-                <option key={r} value={r}>
-                  {REGIMES[r] ?? r}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo rotulo="Ano">
-            <select value={ano} onChange={(e) => setAno(Number(e.target.value))}>
-              {anos.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          {capitulo && aba !== "novo" && aba !== "auditoria" && (
-            <Campo rotulo="Tributos estimados (IPI e ICMS)">
-              <div className="segmentos" role="group" aria-label="Tributos estimados">
-                <button aria-pressed={!semEstimados} onClick={() => setSemEstimados(false)}>
-                  Incluir
+    <div className={`app${recolhido ? " app-recolhido" : ""}`}>
+      <a className="pular-conteudo" href="#conteudo">
+        Pular para o conteúdo
+      </a>
+      <MenuLateral aba={aba} onAba={trocarAba} aberto={menuAberto} onFechar={fecharMenu} recolhido={recolhido} onRecolher={recolher} rodape={<Tema />} />
+      <div className="area">
+        <BarraContexto
+          calculo={calculo}
+          calculos={calculos}
+          onCalculo={onCalculo}
+          aba={aba}
+          anos={anos}
+          ano={ano}
+          onAno={setAno}
+          regime={regime}
+          onRegime={setRegime}
+          cenarioVendas={cenarioVendas}
+          onCenarioVendas={setCenarioVendas}
+          cenarioCompras={cenarioCompras ?? cenarioVendas}
+          onCenarioCompras={setCenarioCompras}
+          semEstimados={semEstimados}
+          onEstimados={setSemEstimados}
+          sentido={sentido}
+          onSentido={setSentido}
+          onMenu={() => setMenuAberto(true)}
+          extra={
+            aba === "geral" ? (
+              <>
+                <a className="botao ctx-csv" href={linkExportar(calculo.id, selecao)} download>
+                  <Download aria-hidden="true" size={14} /> CSV
+                </a>
+                {filtro && (
+              <span className="chip">
+                {DIMENSOES_RANKING[filtro.dimensao]}: {rotuloValor(filtro.dimensao, filtro.valor)}
+                <button aria-label="Remover filtro" onClick={() => setFiltro(null)}>
+                  <X aria-hidden="true" size={13} />
                 </button>
-                <button aria-pressed={semEstimados} onClick={() => setSemEstimados(true)}>
-                  Excluir
-                </button>
-              </div>
-            </Campo>
-          )}
-          {!capitulo && (
-          <>
-          <Campo rotulo="Cenário de vendas">
-            <select value={cenarioVendas} onChange={(e) => setCenarioVendas(e.target.value)}>
-              {calculo.cenarios.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo rotulo="Cenário de compras">
-            <select value={cenarioCompras} onChange={(e) => setCenarioCompras(e.target.value)}>
-              {calculo.cenarios.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo rotulo="Notas">
-            <div className="segmentos" role="group" aria-label="Notas">
-              {(Object.keys(SENTIDOS) as Sentido[]).map((s) => (
-                <button key={s} aria-pressed={sentido === s} onClick={() => setSentido(s)}>
-                  {s === "ambas" ? "Todas" : s === "saida" ? "Vendas" : "Compras"}
-                </button>
-              ))}
-            </div>
-          </Campo>
-          </>
-          )}
-          {capitulo && (
-            <p className="sub" style={{ alignSelf: "center", margin: 0 }}>
-              {aba === "regime"
-                ? `Compara todos os regimes simulados no cálculo; ${ano} fica em destaque. O seletor de regime não se aplica.`
-                : aba === "dre" || aba === "fluxo"
-                ? `DRE e fluxo de caixa mostram todos os anos da transição; ${ano} fica em destaque.`
-                : aba === "auditoria"
-                  ? "A auditoria usa os EFDs que você carregar; regime e ano não se aplicam."
-                  : aba === "novo"
-                  ? `A nota do novo produto é montada para ${ano}; dá para trocar o ano na simulação.`
-                  : `Compras e vendas analisadas em ${ano}.`}
-            </p>
-          )}
-          {!capitulo && filtro && (
-            <span className="chip">
-              {DIMENSOES_RANKING[filtro.dimensao]}: {rotuloValor(filtro.dimensao, filtro.valor)}
-              <button aria-label="Remover filtro" onClick={() => setFiltro(null)}>
-                <X aria-hidden="true" size={13} />
-              </button>
-            </span>
-          )}
-        </div>
-      </section>
-
-      <nav className="abas" aria-label="Visões">
-        {(Object.keys(ABAS) as Aba[]).map((a) => (
-          <button key={a} aria-current={aba === a ? "page" : undefined} onClick={() => trocarAba(a)}>
-            {(() => {
-              const Icone = ICONES_ABA[a]
-              return <Icone aria-hidden="true" size={16} />
-            })()}
-            {ABAS[a]}
-          </button>
-        ))}
-      </nav>
-
+              </span>
+                )}
+              </>
+            ) : null
+          }
+        />
+        <main id="conteudo">
+          {avisos}
+          {calculo.processando && <div className="aviso">Este cálculo está sendo refeito no app. Os números podem mudar quando terminar.</div>}
       {aba === "compras" ? (
         <Compras calculoId={calculo.id} regime={regime} ano={ano} semEstimados={semEstimados} />
       ) : aba === "vendas" ? (
@@ -432,44 +395,12 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
           onAno={setAno}
         />
       )}
-    </>
-  )
-}
-
-const ABAS = {
-  compras: "Compras",
-  vendas: "Vendas",
-  dre: "DRE",
-  fluxo: "Fluxo de caixa",
-  regime: "Melhor regime",
-  novo: "Novo produto",
-  auditoria: "Auditoria EFD",
-  geral: "Visão geral",
-  classificacao: "Auditor IVA",
-} as const
-type Aba = keyof typeof ABAS
-const ICONES_ABA: Record<Aba, LucideIcon> = {
-  compras: ShoppingCart,
-  vendas: TrendingUp,
-  dre: FileChartColumn,
-  fluxo: Wallet,
-  regime: Trophy,
-  novo: PackagePlus,
-  auditoria: ShieldCheck,
-  geral: LayoutDashboard,
-  classificacao: Scale,
-}
-
-/** Rótulo visível e, nos seletores, o mesmo nome para leitores de tela. */
-function Campo({ rotulo, children }: { rotulo: string; children: React.ReactElement<{ "aria-label"?: string }> }) {
-  const nomeado = children.type === "select" && !children.props["aria-label"] ? cloneElement(children, { "aria-label": rotulo }) : children
-  return (
-    <div className="campo">
-      <span className="campo-rotulo">{rotulo}</span>
-      {nomeado}
+        </main>
+      </div>
     </div>
   )
 }
+
 
 function linkExportar(id: string, s: Selecao) {
   const q = new URLSearchParams({
