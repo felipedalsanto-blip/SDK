@@ -42,6 +42,8 @@ export type Resultado = {
   periodo: { inicio: string; fim: string; meses: string[] }
   arquivos: (Pick<ArquivoLido, "indice" | "nome" | "tipo" | "cnpj" | "empresa" | "periodo" | "finalidade" | "versao" | "linhas" | "uf"> & { erros: number })[]
   estabelecimentos: { cnpj: string; nome: string; uf: string; ie: string; fiscal: Record<string, number>; contribuicoes: Record<string, number> }[]
+  /** Meses com o EFD Contribuições da empresa (o arquivo é um só, da matriz, para todos os estabelecimentos). */
+  mesesContribuicoes: string[]
   checklist: ItemChecklist[]
   pendencias: Pendencia[]
   achados: Achado[]
@@ -316,7 +318,8 @@ export function analisar(leitura: Leitura, regra: RegraCfop): Resultado {
   let semIe = 0
   for (const e of estabs.values()) {
     const temContrib = Object.keys(e.contribuicoes).length > 0
-    const precisa = meses.filter((m) => (temContrib ? e.contribuicoes[m] : true))
+    // Com inscrição estadual (ou algum EFD ICMS/IPI enviado), o EFD ICMS/IPI é mensal, com ou sem movimento.
+    const precisa = meses
     if (!e.ie && !Object.keys(e.fiscal).length) {
       semIe++
       continue // sem inscrição estadual e sem EFD Fiscal: em regra não é contribuinte do ICMS
@@ -346,6 +349,19 @@ export function analisar(leitura: Leitura, regra: RegraCfop): Resultado {
   }
   const retificadoras = todos.filter((a) => a.finalidade === "retificadora")
 
+  // Nome do arquivo que indica uma competência e conteúdo (0000) de outra.
+  let nomeTrocado = 0
+  for (const a of todos) {
+    const doNome = competenciaDoNome(a.nome)
+    if (!doNome || !a.periodo || doNome === a.periodo) continue
+    nomeTrocado++
+    pendencias.push({
+      tipo: a.tipo === "fiscal" ? "EFD ICMS/IPI" : "EFD Contribuições", cnpj: fmtCnpj(a.cnpj), estabelecimento: a.empresa, competencia: fmtMes(a.periodo),
+      problema: `O nome do arquivo indica ${fmtMes(doNome)}, mas o conteúdo (registro 0000) é de ${fmtMes(a.periodo)} (${a.nome})`,
+      acao: `Confirmar a competência. Se o arquivo de ${fmtMes(doNome)} não foi enviado, enviar.`,
+    })
+  }
+
   const checklist: ItemChecklist[] = [
     { item: "1.1", descricao: "Recebemos EFD ICMS/IPI (Fiscal)", ok: fiscais.length > 0, detalhe: `${fiscais.length} arquivo(s)` },
     { item: "1.1", descricao: "Recebemos EFD Contribuições", ok: contribs.length > 0, detalhe: `${contribs.length} arquivo(s)` },
@@ -356,6 +372,7 @@ export function analisar(leitura: Leitura, regra: RegraCfop): Resultado {
       detalhe: faltaFiscal ? `${faltaFiscal} competência(s) de estabelecimento sem EFD ICMS/IPI` : `${estabs.size} estabelecimento(s) conferidos${semIe ? `; ${semIe} sem IE e sem EFD Fiscal (não contribuinte do ICMS)` : ""}`,
     },
     { item: "1.1.1", descricao: "Cada EFD ICMS/IPI tem o EFD Contribuições da empresa no mesmo mês", ok: fiscalSemContrib === 0, detalhe: fiscalSemContrib ? `${fiscalSemContrib} competência(s) sem EFD Contribuições` : "ok" },
+    { item: "1.1.2", descricao: "O nome de cada arquivo confere com a competência do conteúdo", ok: nomeTrocado === 0, detalhe: nomeTrocado ? `${nomeTrocado} arquivo(s) com nome de uma competência e conteúdo de outra` : "ok" },
     { item: "1.1.2", descricao: "Nenhum arquivo duplicado", ok: duplicados === 0, detalhe: duplicados ? `${duplicados} duplicidade(s)` : "ok" },
     { item: "1.1.2", descricao: "Nenhuma competência faltando", ok: faltaContrib + faltaFiscal === 0, detalhe: `${meses.length} mês(es) de ${fmtMes(meses[0])} a ${fmtMes(meses[meses.length - 1])}; faltam ${faltaContrib} de Contribuições e ${faltaFiscal} de Fiscal` },
     {
@@ -526,9 +543,11 @@ export function analisar(leitura: Leitura, regra: RegraCfop): Resultado {
   }
 
   // 2.2.1 Entradas com emissão própria (exceto devolução)
-  const proprias = l.docs.filter((d) => d.fonte === "fiscal" && valido(d) && d.oper === "0" && d.emit === "0" && !d.cfops.every(ehDevolucao))
+  // Aquisições com nota própria (não remessas, retornos nem devoluções). Importação conta à parte.
+  const proprias = l.docs.filter((d) => d.fonte === "fiscal" && valido(d) && d.oper === "0" && d.emit === "0" && d.cfops.some(ehCompra) && !d.cfops.every(ehDevolucao))
   const valorProprias = soma(proprias)
-  const semItens = proprias.filter((d) => d.itens === 0)
+  const importadas = proprias.filter((d) => d.cfops.some(ehImportacao) && d.itens === 0)
+  const semItens = proprias.filter((d) => d.itens === 0 && !d.cfops.some(ehImportacao))
   const valorSemItens = soma(semItens)
   const repProprias = pct(valorSemItens, base.compras)
   const propriasPorFornecedor = new Map<string, Record<string, string | number>>()
@@ -547,7 +566,7 @@ export function analisar(leitura: Leitura, regra: RegraCfop): Resultado {
     id: "2.2.1", etapa: "2", item: "2.2.1", titulo: "Entradas com documento próprio (exceto devolução)",
     criticidade: porRepresentatividade(repProprias), valor: valorSemItens, representatividade: repProprias,
     resumo: proprias.length
-      ? `${proprias.length} entrada(s) com nota própria (${moeda(valorProprias)}); ${semItens.length} delas sem itens (C170), ${moeda(valorSemItens)} = ${pctTexto(repProprias)} das compras (${repProprias > 0.05 ? "acima" : "abaixo"} de 5%). Sem o C170 a análise desses documentos fica fraca.`
+      ? `${proprias.length} aquisição(ões) com nota própria (${moeda(valorProprias)}). Nacionais sem itens (C170): ${semItens.length}, ${moeda(valorSemItens)} = ${pctTexto(repProprias)} das compras (${repProprias > 0.05 ? "acima" : "abaixo"} de 5%).${importadas.length ? ` Importações sem itens: ${importadas.length}, ${moeda(soma(importadas))} (${pctTexto(pct(soma(importadas), base.compras))} das compras), detalhadas no item de importação: para o item a item, precisamos dos XML ou da DI.` : ""} Sem o C170 a análise desses documentos fica fraca.`
       : "Nenhuma entrada com documento próprio.",
     tabela: proprias.length
       ? tabela([C.part, C.partDoc, C.cfop, C.cst, C.reforma, C.vlDoc, C.icms, C.st, C.ipi, C.qtd], [...propriasPorFornecedor.values()].sort((a, b) => (b.vlDoc as number) - (a.vlDoc as number)))
@@ -677,28 +696,42 @@ export function analisar(leitura: Leitura, regra: RegraCfop): Resultado {
     fontes: ["l10637", "l10833"],
   })
 
-  // 3.3 Crédito presumido (ICMS por ajuste; PIS/COFINS por CST 60 a 67)
+  // 3.3 Crédito presumido: por código de ajuste, com a natureza; o E111 separa crédito e estorno.
   const presumidoIcms = l.ajustes.filter((x) => /presum/i.test(x.descricao))
   const presumidoPc = l.itens.filter((g) => /^6[0-7]$/.test(g.cstPis) || /^6[0-7]$/.test(g.cstCofins))
   const bcPc = presumidoPc.reduce((s, g) => s + g.valor, 0)
   const credPc = presumidoPc.reduce((s, g) => s + g.pis + g.cofins, 0)
+  const porCodigoPres = new Map<string, { reg: string; codigo: string; uf: string; natureza: string; descricao: string; lancamentos: number; valor: number }>()
+  for (const x of presumidoIcms) {
+    const k = `${x.reg}|${x.codigo}`
+    const a = porCodigoPres.get(k) ?? { reg: x.reg, codigo: x.codigo, uf: x.codigo.slice(0, 2), natureza: x.reg === "E111" ? x.tipo : "ajuste por documento (ver tabela de códigos da UF)", descricao: x.descricao, lancamentos: 0, valor: 0 }
+    a.lancamentos++
+    a.valor = r2(a.valor + x.valor)
+    porCodigoPres.set(k, a)
+  }
+  const e111Cred = presumidoIcms.filter((x) => x.reg === "E111" && x.tipo === "outros créditos").reduce((s, x) => s + x.valor, 0)
+  const e111Est = presumidoIcms.filter((x) => x.reg === "E111" && x.tipo === "estorno de créditos").reduce((s, x) => s + x.valor, 0)
+  const c197Cods = [...porCodigoPres.values()].filter((x) => x.reg === "C197")
   achados.push({
     id: "3.3", etapa: "3", item: "3.3", titulo: "Crédito presumido",
     criticidade: presumidoIcms.length || presumidoPc.length ? "media" : "ok",
-    valor: presumidoIcms.reduce((s, x) => s + x.valor, 0) + credPc,
     resumo: presumidoIcms.length || presumidoPc.length
       ? [
-          presumidoIcms.length ? `ICMS: ${presumidoIcms.length} ajuste(s), ${moeda(presumidoIcms.reduce((s, x) => s + x.valor, 0))}.` : "",
+          e111Cred || e111Est ? `ICMS na apuração (E111): ${moeda(e111Cred)} de crédito presumido e ${moeda(e111Est)} de estorno, líquido de ${moeda(e111Cred - e111Est)}.` : "",
+          c197Cods.length ? `ICMS por documento (C197): ${c197Cods.length} código(s) de ${[...new Set(c197Cods.map((x) => x.uf))].join(", ")} (${c197Cods.map((x) => `${x.codigo} ${moeda(x.valor)}`).join("; ")}); são lançamentos que se compensam, veja a natureza de cada código.` : "",
           presumidoPc.length ? `PIS/COFINS (CST 60 a 67): ${moeda(credPc)} de crédito sobre ${moeda(bcPc)}, alíquota efetiva de ${pctTexto(pct(credPc, bcPc))}.` : "",
-          "Conferir o fundamento do benefício e as condições de manutenção na transição.",
+          "Conferir o ato concessivo, as condições e se o benefício está entre os mantidos na transição.",
         ].filter(Boolean).join(" ")
       : "Nenhum crédito presumido identificado.",
-    tabela: presumidoPc.length ? tabelaItens(presumidoPc, ["cstPis", "aliqPis", "cstCofins", "aliqCofins", "ncm", "descricao"], ehReforma, ["pis", "cofins"]) : undefined,
+    tabela: porCodigoPres.size
+      ? tabela([{ id: "reg", nome: "Registro", tipo: "texto" }, { id: "uf", nome: "UF", tipo: "texto" }, { id: "codigo", nome: "Código", tipo: "texto" }, { id: "natureza", nome: "Natureza", tipo: "texto" }, { id: "descricao", nome: "Descrição", tipo: "texto" }, { id: "lancamentos", nome: "Lançamentos", tipo: "num" }, C.valor],
+          [...porCodigoPres.values()].sort((a, b) => b.valor - a.valor))
+      : presumidoPc.length ? tabelaItens(presumidoPc, ["cstPis", "aliqPis", "cstCofins", "aliqCofins", "ncm", "descricao"], ehReforma, ["pis", "cofins"]) : undefined,
     detalhe: presumidoIcms.length
-      ? tabela([C.periodo, C.estab, { id: "reg", nome: "Registro", tipo: "texto" }, { id: "codigo", nome: "Código", tipo: "texto" }, { id: "descricao", nome: "Descrição", tipo: "texto" }, C.valor],
-          presumidoIcms.map((x) => ({ periodo: fmtMes(x.periodo), estab: fmtCnpj(x.estab), reg: x.reg, codigo: x.codigo, descricao: x.descricao, valor: r2(x.valor) })))
+      ? tabela([C.periodo, C.estab, { id: "reg", nome: "Registro", tipo: "texto" }, { id: "codigo", nome: "Código", tipo: "texto" }, { id: "descricao", nome: "Descrição", tipo: "texto" }, C.doc, C.valor],
+          presumidoIcms.map((x) => ({ periodo: fmtMes(x.periodo), estab: fmtCnpj(x.estab), reg: x.reg, codigo: x.codigo, descricao: x.descricao, doc: x.doc ?? "", valor: r2(x.valor) })))
       : undefined,
-    comoResolver: "Conferir o ato concessivo (ICMS: legislação da UF indicada pelo código do ajuste; PIS/COFINS: o artigo de lei correspondente ao CST e à natureza do crédito) e se o benefício está entre os mantidos na transição.",
+    comoResolver: "Conferir o ato concessivo (ICMS: legislação e regime especial da UF indicada no código, como TTD em SC; PIS/COFINS: o artigo de lei do CST e da natureza do crédito) e se o benefício é mantido na transição.",
     fontes: ["l10925", "lc214", "sped"],
   })
 
@@ -812,23 +845,36 @@ export function analisar(leitura: Leitura, regra: RegraCfop): Resultado {
 
   // 3.9 Registros especiais e possíveis inconsistências
   const especiais39: { ponto: string; criticidade: Criticidade; onde: string }[] = []
+  // Agrupa por estabelecimento: um ponto por estabelecimento, com os meses, em vez de um por arquivo.
+  const porEstab = new Map<string, { ponto: string; criticidade: Criticidade; estab: string; nome: string; meses: string[] }>()
+  const marcar = (ponto: string, criticidade: Criticidade, a: ArquivoLido) => {
+    const k = `${ponto}|${a.cnpj}`
+    const x = porEstab.get(k) ?? { ponto, criticidade, estab: a.cnpj, nome: a.empresa, meses: [] }
+    x.meses.push(fmtMes(a.periodo))
+    porEstab.set(k, x)
+  }
   for (const a of fiscaisValidos) {
     if (a.indAtiv === "0" && !a.registros.K200 && !a.registros.K230)
-      especiais39.push({ ponto: "Empresa industrial sem Bloco K (produção e estoque)", criticidade: "media", onde: `${fmtCnpj(a.cnpj)} · ${fmtMes(a.periodo)}` })
-    if (a.periodo.endsWith("-02") && !a.registros.H010)
-      especiais39.push({ ponto: "Fevereiro sem inventário (Bloco H, H010)", criticidade: "baixa", onde: `${fmtCnpj(a.cnpj)} · ${fmtMes(a.periodo)}` })
+      marcar("Declarado industrial (IND_ATIV = 0) sem Bloco K: confirmar se o estabelecimento produz (trading e escritório em geral não produzem)", "baixa", a)
+    if (a.periodo.endsWith("-02") && !a.registros.H010) marcar("Fevereiro sem inventário (Bloco H, H010)", "baixa", a)
     if (!a.registros.G110 && l.porCfop.some((x) => x.estab === a.cnpj && x.periodo === a.periodo && /^[12]55[1-3]$/.test(x.cfop)))
-      especiais39.push({ ponto: "Compra de ativo (CFOP 1551/2551) sem CIAP (Bloco G)", criticidade: "media", onde: `${fmtCnpj(a.cnpj)} · ${fmtMes(a.periodo)}` })
-    if (a.registros.C101 && !a.registros.E300)
-      especiais39.push({ ponto: "DIFAL nos documentos (C101) sem apuração do DIFAL (E300/E310)", criticidade: "alta", onde: `${fmtCnpj(a.cnpj)} · ${fmtMes(a.periodo)}` })
+      marcar("Compra de ativo (CFOP 1551/2551) sem CIAP (Bloco G): crédito do ativo pode não estar sendo apropriado", "media", a)
+    if (a.registros.C101 && !a.registros.E300) marcar("DIFAL nos documentos (C101) sem apuração do DIFAL (E300/E310)", "alta", a)
     if (a.erros.length) especiais39.push({ ponto: `Linhas que não puderam ser lidas (${a.erros.length})`, criticidade: "media", onde: a.nome })
   }
+  for (const x of porEstab.values())
+    especiais39.push({ ponto: x.ponto, criticidade: x.criticidade, onde: `${fmtCnpj(x.estab)} ${x.nome} · ${x.meses.length} mês(es): ${x.meses.join(", ")}` })
   const semChave = l.docs.filter((d) => valido(d) && d.mod === "55" && d.chave.length !== 44)
   if (semChave.length) especiais39.push({ ponto: `${semChave.length} NF-e (modelo 55) sem chave de acesso válida`, criticidade: "media", onde: "documentos" })
   const chaves = new Map<string, number>()
-  for (const d of l.docs.filter((x) => x.fonte === "fiscal" && x.chave)) chaves.set(`${d.estab}|${d.chave}`, (chaves.get(`${d.estab}|${d.chave}`) ?? 0) + 1)
-  const repetidas = [...chaves.values()].filter((n) => n > 1).length
-  if (repetidas) especiais39.push({ ponto: `${repetidas} chave(s) de acesso escriturada(s) mais de uma vez no mesmo estabelecimento`, criticidade: "alta", onde: "EFD ICMS/IPI" })
+  for (const d of l.docs.filter((x) => x.fonte === "fiscal" && x.chave && valido(x))) chaves.set(`${d.estab}|${d.chave}|${d.periodo}`, (chaves.get(`${d.estab}|${d.chave}|${d.periodo}`) ?? 0) + 1)
+  const repetidas = [...chaves.entries()].filter(([, n]) => n > 1)
+  if (repetidas.length)
+    especiais39.push({
+      ponto: `${repetidas.length} chave(s) de acesso escriturada(s) mais de uma vez no mesmo estabelecimento e competência: o documento pode estar somado em dobro`,
+      criticidade: "alta",
+      onde: repetidas.slice(0, 5).map(([k]) => `${fmtCnpj(k.split("|")[0])} · ${k.split("|")[1]}`).join("; ") + (repetidas.length > 5 ? "…" : ""),
+    })
   const divergeItens = l.docs.filter((d) => d.itens > 0 && d.vlMerc > 0 && Math.abs(d.somaItens - d.vlMerc) > 1)
   if (divergeItens.length) especiais39.push({ ponto: `${divergeItens.length} documento(s) com soma dos itens diferente do valor das mercadorias`, criticidade: "media", onde: "C100 × C170" })
   const grandesAjustes = l.ajustes.filter((x) => x.reg === "E111" && x.valor > 0)
@@ -851,6 +897,7 @@ export function analisar(leitura: Leitura, regra: RegraCfop): Resultado {
     periodo: { inicio: meses[0] ?? "", fim: meses[meses.length - 1] ?? "", meses },
     arquivos: l.arquivos.map((a) => ({ indice: a.indice, nome: a.nome, tipo: a.tipo, cnpj: a.cnpj, empresa: a.empresa, periodo: a.periodo, finalidade: a.finalidade, versao: a.versao, linhas: a.linhas, uf: a.uf, erros: a.erros.length })),
     estabelecimentos: [...estabs.values()].sort((a, b) => a.cnpj.localeCompare(b.cnpj)),
+    mesesContribuicoes: [...new Set(contribs.map((a) => a.periodo))].sort(),
     checklist,
     pendencias,
     achados,
@@ -927,6 +974,19 @@ function groupBy<T>(xs: T[], f: (x: T) => string) {
   const r: Record<string, T[]> = {}
   for (const x of xs) (r[f(x)] ??= []).push(x)
   return r
+}
+
+/** A competência que o nome do arquivo sugere: "dez2025", "nov.2025", "012025", "_20260101_". */
+const MESES_NOME: Record<string, string> = { jan: "01", fev: "02", mar: "03", abr: "04", mai: "05", jun: "06", jul: "07", ago: "08", set: "09", out: "10", nov: "11", dez: "12" }
+export function competenciaDoNome(nome: string): string | null {
+  const n = nome.toLowerCase()
+  const porExtenso = n.match(/(?:^|[^a-z])(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*[ ._-]*((?:19|20)\d{2})/)
+  if (porExtenso) return `${porExtenso[2]}-${MESES_NOME[porExtenso[1]]}`
+  const data = n.match(/(?:^|[^0-9])((?:19|20)\d{2})(0[1-9]|1[0-2])01(?:[^0-9]|$)/)
+  if (data) return `${data[1]}-${data[2]}`
+  const mesAno = n.match(/(?:^|[^0-9])(0[1-9]|1[0-2])((?:19|20)\d{2})(?:[^0-9]|$)/)
+  if (mesAno) return `${mesAno[2]}-${mesAno[1]}`
+  return null
 }
 
 const ORDEM: Criticidade[] = ["ok", "info", "baixa", "media", "alta"]

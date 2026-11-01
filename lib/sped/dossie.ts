@@ -87,7 +87,7 @@ td.longo{white-space:normal;min-width:260px}
 .check b.s{font-size:16px;line-height:1}.check .okk{color:var(--ok)}.check .nok{color:var(--alta)}
 .grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
 svg text{fill:var(--mut);font-size:11px}
-.mapa td.c{text-align:center;font-weight:700}.mapa .s{color:var(--ok)}.mapa .n{color:var(--alta)}
+.mapa td.c{text-align:center;font-weight:700}.mapa .s{color:var(--ok)}.mapa .n{color:var(--alta)}.mapa .g{color:var(--mut)}
 pre.msg{white-space:pre-wrap;background:var(--sup2);border-radius:10px;padding:12px;font:12.5px/1.5 ui-monospace,monospace}
 a{color:inherit}
 @media print{nav,header{position:static}section{display:grid!important}.tab{max-height:none}}
@@ -180,11 +180,11 @@ nav.querySelector('button').setAttribute('aria-current','true');
   var c=el('div',{class:'card'},'<h2>Checklist dos documentos</h2><p class="sub">EFD ICMS/IPI e EFD Contribuições: estabelecimentos, meses, duplicidades e versões.</p>');
   var ck='<div class="check">'+R.checklist.map(function(i){return '<div><b class="s '+(i.ok?'okk':'nok')+'">'+(i.ok?'✓':'✗')+'</b><span><b>'+es(i.item)+'</b> '+es(i.descricao)+'<br><span class="sub">'+es(i.detalhe)+'</span></span></div>'}).join('')+'</div>';
   c.innerHTML+=ck;s.appendChild(c);
-  var mapa=el('div',{class:'card'},'<h2>Mapa de entregas</h2><p class="sub">F = EFD ICMS/IPI · C = EFD Contribuições. Verde recebido, vermelho faltando.</p>');
+  var mapa=el('div',{class:'card'},'<h2>Mapa de entregas</h2><p class="sub">F = EFD ICMS/IPI do estabelecimento · C = EFD Contribuições da empresa. Verde: recebido. Cinza: arquivo recebido, mas o estabelecimento não consta no 0140 do mês. Vermelho: faltando.</p>');
   var h='<div class="tab mapa"><table><thead><tr><th>Estabelecimento</th><th>IE</th>'+R.periodo.meses.map(function(m){return '<th>'+m.slice(5,7)+'/'+m.slice(0,4)+'</th>'}).join('')+'</tr></thead><tbody>';
   R.estabelecimentos.forEach(function(e){h+='<tr><td>'+es(e.nome||'')+'<br><span class="sub">'+es(e.cnpj)+'</span></td><td>'+es(e.ie||'—')+'</td>'+R.periodo.meses.map(function(m){
     var f=e.fiscal[m],ct=e.contribuicoes[m];var precisaF=!!e.ie||Object.keys(e.fiscal).length>0;
-    return '<td class="c">'+(precisaF?'<span class="'+(f?'s':'n')+'">F'+(f>1?'×'+f:'')+'</span> ':'')+'<span class="'+(ct?'s':'n')+'">C</span></td>'}).join('')+'</tr>'});
+    return '<td class="c">'+(precisaF?'<span class="'+(f?'s':'n')+'">F'+(f>1?'×'+f:'')+'</span> ':'')+'<span class="'+(ct?'s':(R.mesesContribuicoes.indexOf(m)>=0?'g':'n'))+'">C</span></td>'}).join('')+'</tr>'});
   mapa.innerHTML+=h+'</tbody></table></div>';s.appendChild(mapa);
   var p=el('div',{class:'card'},'<h2>Pendências para o cliente</h2>');
   if(!R.pendencias.length)p.innerHTML+='<p>Nenhuma pendência: todos os arquivos estão completos.</p>';

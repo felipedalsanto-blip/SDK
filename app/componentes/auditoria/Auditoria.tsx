@@ -303,7 +303,10 @@ function Etapa1({ r }: { r: Resultado }) {
           ))}
         </ul>
       </Bloco>
-      <Bloco titulo="Mapa de entregas por estabelecimento" leitura="F = EFD ICMS/IPI · C = EFD Contribuições. Verde recebido; vermelho faltando. Estabelecimento sem inscrição estadual e sem EFD ICMS/IPI não precisa dele.">
+      <Bloco
+        titulo="Mapa de entregas por estabelecimento"
+        leitura="F = EFD ICMS/IPI do estabelecimento · C = EFD Contribuições da empresa (um arquivo para todos). Verde: recebido. Cinza: arquivo recebido, mas o estabelecimento não consta no 0140 do mês (sem operações de PIS/COFINS). Vermelho: faltando."
+      >
         <div className="tabela-rolagem" tabIndex={0}>
           <table className="cap-tabela aud-mapa-entregas">
             <thead>
@@ -330,7 +333,15 @@ function Etapa1({ r }: { r: Resultado }) {
                     {r.periodo.meses.map((m) => (
                       <td key={m} className="num">
                         {precisaF && <span className={e.fiscal[m] ? "aud-s" : "aud-n"}>F{(e.fiscal[m] ?? 0) > 1 ? `×${e.fiscal[m]}` : ""}</span>}{" "}
-                        <span className={e.contribuicoes[m] ? "aud-s" : "aud-n"}>C</span>
+                        {e.contribuicoes[m] ? (
+                          <span className="aud-s">C</span>
+                        ) : r.mesesContribuicoes.includes(m) ? (
+                          <span className="aud-cinza" title="EFD Contribuições recebido; o estabelecimento não consta no 0140 deste mês">
+                            C
+                          </span>
+                        ) : (
+                          <span className="aud-n">C</span>
+                        )}
                       </td>
                     ))}
                   </tr>

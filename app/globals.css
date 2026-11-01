@@ -735,3 +735,4 @@ td.aud-longo { white-space: normal; min-width: 280px; }
 .aud-mapa summary, .aud-regra summary { cursor: pointer; font-weight: 600; }
 .aud-regra { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--raio-bloco, 16px); padding: 16px 22px; display: grid; gap: 10px; }
 .aud-grafico text { fill: var(--text-muted); font-size: 11px; }
+.aud-cinza { color: var(--text-muted); font-weight: 600; cursor: help; }
