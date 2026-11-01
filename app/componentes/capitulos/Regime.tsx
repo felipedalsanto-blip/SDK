@@ -133,7 +133,7 @@ export function MelhorRegime({ calculo, ano, semEstimados }: { calculo: CalculoD
   ]
 
   return (
-    <Capitulo numero="05" icone={Trophy} titulo={`Melhor regime tributário · ${anoVisto}`} sub="A DRE de cada regime simulado, lado a lado, com as mesmas premissas.">
+    <Capitulo numero="06" icone={Trophy} titulo={`Melhor regime tributário · ${anoVisto}`} sub="A DRE de cada regime simulado, lado a lado, com as mesmas premissas.">
       <Bloco titulo="Recomendação">
         <div className="rg-destaque">
           <div>

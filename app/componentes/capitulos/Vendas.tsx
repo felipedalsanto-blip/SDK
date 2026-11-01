@@ -40,7 +40,7 @@ export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: st
   return (
     <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} semEstimados={semEstimados} sentido="saida" cenario={dados.cenario.id}>
     <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
-      <Capitulo numero="02" icone={TrendingUp} titulo={`Vendas · ${dados.ano}`} sub={`Os caminhos de preço para ${dados.ano} e o que cada um faz com o resultado.`}>
+      <Capitulo numero="03" icone={TrendingUp} titulo={`Vendas · ${dados.ano}`} sub={`Os caminhos de preço para ${dados.ano} e o que cada um faz com o resultado.`}>
         <Bloco titulo="Os cenários de preço" leitura="Escolha um cenário para ver as listas e os padrões logo abaixo.">
           <div className="cap-cenarios">
             {dados.cenarios.map((c) => (

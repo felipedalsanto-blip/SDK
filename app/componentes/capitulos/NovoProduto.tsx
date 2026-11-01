@@ -181,7 +181,7 @@ function Simulador({
 
   return (
     <Capitulo
-      numero="05"
+      numero="09"
       icone={PackagePlus}
       titulo="Novo produto · formação de preço"
       sub="Do valor líquido até a nota fiscal: margem, tributos de hoje, IBS e CBS, para um produto, serviço ou locação que ainda não está no histórico."

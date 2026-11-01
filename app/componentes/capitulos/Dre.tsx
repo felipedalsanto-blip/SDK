@@ -128,7 +128,7 @@ export function Dre({
 
   return (
     <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
-      <Capitulo numero="03" icone={FileChartColumn} titulo="DRE · 2027 a 2033" sub="O efeito do IBS e da CBS na DRE, ano a ano, em cada cenário de preço.">
+      <Capitulo numero="04" icone={FileChartColumn} titulo="DRE · 2027 a 2033" sub="O efeito do IBS e da CBS na DRE, ano a ano, em cada cenário de preço.">
         <Bloco titulo="Como ler a DRE da reforma">
           <div className="cap-didatico">
             <div>

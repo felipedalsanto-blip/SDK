@@ -27,7 +27,7 @@ export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: s
     <ProvedorFicha calculoId={calculoId} regime={regime} ano={ano} semEstimados={semEstimados} sentido="entrada">
     <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
       <Capitulo
-        numero="01"
+        numero="02"
         icone={ShoppingCart}
         titulo={`Compras · ${dados.ano}`}
         sub={`${dados.ano === 2027 ? "O ano das ações. " : ""}Cenário de compras ${dados.cenario}: o fornecedor tira os tributos atuais do preço e soma o IBS e a CBS.`}

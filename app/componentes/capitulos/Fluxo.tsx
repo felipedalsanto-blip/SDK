@@ -46,7 +46,7 @@ export function Fluxo({
 
   return (
     <div className={carregando ? "carregando" : undefined} aria-busy={carregando}>
-      <Capitulo numero="04" icone={Wallet} titulo="Fluxo de caixa · 2027 a 2033" sub="Quanto entra dos clientes, sai para fornecedores e vai para o governo, ano a ano.">
+      <Capitulo numero="05" icone={Wallet} titulo="Fluxo de caixa · 2027 a 2033" sub="Quanto entra dos clientes, sai para fornecedores e vai para o governo, ano a ano.">
         <Bloco
           titulo="Fluxo de caixa operacional"
           leitura="No formato que o financeiro usa: entradas positivas, saídas negativas. Clique numa linha com ▸ para abrir até o tributo."
