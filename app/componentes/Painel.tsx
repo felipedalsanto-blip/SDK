@@ -7,6 +7,7 @@ import {
   Monitor,
   Moon,
   PackagePlus,
+  ShieldCheck,
   ShoppingCart,
   Sun,
   TrendingUp,
@@ -15,6 +16,12 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { Carregando } from "./capitulos/ui"
+import dynamic from "next/dynamic"
+
+// A auditoria (leitor de EFD, análises e dossiê) só é baixada quando a aba é aberta.
+const Auditoria = dynamic(() => import("./auditoria/Auditoria").then((m) => m.Auditoria), {
+  loading: () => <Carregando mensagem="Abrindo a auditoria…" indicadores={2} />,
+})
 import { cloneElement, useEffect, useMemo, useState } from "react"
 import type { Calculo, CalculoDetalhe } from "@pricetax/sdk"
 import {
@@ -214,7 +221,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
     filtro,
   }
   const chave = JSON.stringify(selecao)
-  const capitulo = aba === "compras" || aba === "vendas" || aba === "dre" || aba === "fluxo" || aba === "novo"
+  const capitulo = aba === "compras" || aba === "vendas" || aba === "dre" || aba === "fluxo" || aba === "novo" || aba === "auditoria"
   const chaveSerie = JSON.stringify({ ...selecao, recorte: { ...selecao.recorte, ano: null } })
 
   return (
@@ -262,7 +269,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
               ))}
             </select>
           </Campo>
-          {capitulo && aba !== "novo" && (
+          {capitulo && aba !== "novo" && aba !== "auditoria" && (
             <Campo rotulo="Tributos estimados (IPI e ICMS)">
               <div className="segmentos" role="group" aria-label="Tributos estimados">
                 <button aria-pressed={!semEstimados} onClick={() => setSemEstimados(false)}>
@@ -309,7 +316,9 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
             <p className="sub" style={{ alignSelf: "center", margin: 0 }}>
               {aba === "dre" || aba === "fluxo"
                 ? `DRE e fluxo de caixa mostram todos os anos da transição; ${ano} fica em destaque.`
-                : aba === "novo"
+                : aba === "auditoria"
+                  ? "A auditoria usa os EFDs que você carregar; regime e ano não se aplicam."
+                  : aba === "novo"
                   ? `A nota do novo produto é montada para ${ano}; dá para trocar o ano na simulação.`
                   : `Compras e vendas analisadas em ${ano}.`}
             </p>
@@ -345,6 +354,8 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
         <Dre calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} semEstimados={semEstimados} />
       ) : aba === "fluxo" ? (
         <Fluxo calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} semEstimados={semEstimados} />
+      ) : aba === "auditoria" ? (
+        <Auditoria />
       ) : aba === "novo" ? (
         <NovoProduto calculoId={calculo.id} regime={regime} ano={ano} />
       ) : aba === "geral" ? (
@@ -383,6 +394,7 @@ const ABAS = {
   dre: "DRE",
   fluxo: "Fluxo de caixa",
   novo: "Novo produto",
+  auditoria: "Auditoria EFD",
   geral: "Visão geral",
   classificacao: "Classificação CST / cClassTrib",
 } as const
@@ -393,6 +405,7 @@ const ICONES_ABA: Record<Aba, LucideIcon> = {
   dre: FileChartColumn,
   fluxo: Wallet,
   novo: PackagePlus,
+  auditoria: ShieldCheck,
   geral: LayoutDashboard,
   classificacao: ListChecks,
 }

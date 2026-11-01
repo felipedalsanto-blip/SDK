@@ -134,3 +134,39 @@ Ao fim de Compras, um aviso mostra quanto do valor comprado está em itens sem N
 ## Totais por tipo (Compras e Vendas)
 
 Antes das tabelas por regime, Compras e Vendas abrem com o total por **produto, serviço, locação de bem imóvel e locação de bem móvel**, com as mesmas colunas das listas (valor, custo e impostos/créditos que expandem até o tributo), a participação no valor e a linha de total. A categoria vem do tipo de linha e do tipo de operação do cálculo (`lib/tipos.ts`); um tipo fora das quatro aparece com o próprio nome. Respeita o ano, o cenário de venda e a chave de tributos estimados.
+
+## Auditoria de entrada (EFD)
+
+Aba **Auditoria EFD**: o usuário carrega os EFD ICMS/IPI e EFD Contribuições do cliente, e o painel faz a auditoria de entrada em 4 etapas. Os arquivos são lidos **no navegador**, num Web Worker, em pedaços e em ISO-8859-1: nada é enviado a servidor.
+
+1. **Documentos enviados**:
+   - matriz e filiais do 0140 × EFD ICMS/IPI de cada mês;
+   - duplicidades, meses faltando, original junto com retificadora;
+   - checklist, mapa de entregas e pendências, com a mensagem pronta para o cliente.
+2. **Acurácia**:
+   - EFD Contribuições consolidado (C010/C180…), regime de caixa (0110, F500/F510/F525), NFC-e;
+   - ajustes, estornos e F100 com peso: acima de 10% alta, de 3% a 10% média, abaixo de 3% baixa;
+   - importação e exportação;
+   - entradas com nota própria sem C170, DIFAL para não contribuinte e NCM genérico, com a regra dos 5% (acima de 5% alta, abaixo baixa).
+3. **Consolidação**:
+   - apuração de ICMS, ICMS-ST, DIFAL, IPI, PIS e COFINS mês a mês, com o perfil credor ou devedor;
+   - receitas financeiras, depreciação e locação;
+   - crédito presumido, crédito de ICMS de fornecedor do Simples (CSOSN no C170), regime × alíquotas de PIS/COFINS;
+   - CST monofásico, alíquota zero, isento, suspenso e sem incidência, com o possível motivo;
+   - Zona Franca de Manaus e IPI acima ou abaixo de 6,5%;
+   - registros especiais (Bloco K, H, G, E300…).
+4. **Divergências com o relatório da Pricetax**:
+   - o EFD Fiscal e o Contribuições são unidos sem duplicidade pela chave de acesso;
+   - o resultado é cruzado com o Excel/CSV da Pricetax, cujas colunas são reconhecidas por analogia e ajustáveis;
+   - o cruzamento é por documento, fornecedor, CFOP e NCM, com a causa provável de cada diferença.
+
+Todas as análises separam os **CFOPs da reforma** dos demais. A regra padrão fica em `lib/sped/cfop.ts` e pode ser editada na tela.
+
+O botão **Gerar dossiê HTML** baixa um arquivo único e autônomo, com a identidade PriceTax e as abas:
+- veredito, com gráficos e o que pedir ao cliente;
+- as etapas 1 a 4;
+- o micro, documento a documento, com busca por chave, fornecedor, CFOP e NCM;
+- os ajustes e estornos linha a linha;
+- a legislação, com links oficiais.
+
+O código fica em `lib/sped/`: leitor, análise, cruzamento, dossiê e fontes. Os EFDs sintéticos de teste ficam em `test/sped/gerador.ts`.

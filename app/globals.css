@@ -689,3 +689,49 @@ tbody tr:hover { background: color-mix(in srgb, var(--pt-amarelo) 7%, var(--surf
 .tabela-rolagem, .cap-seta { position: relative; }
 .botao { color: var(--text-primary); }
 .botao svg { color: var(--text-secondary); }
+
+/* Auditoria EFD */
+.aud-solta { display: grid; justify-items: center; gap: 6px; padding: 28px 20px; border: 2px dashed var(--border); border-radius: var(--raio-bloco, 16px); background: var(--surface-2); cursor: pointer; text-align: center; transition: border-color 0.18s, background 0.18s; }
+.aud-solta:hover, .aud-solta:focus-within { border-color: var(--pt-amarelo); background: color-mix(in srgb, var(--pt-amarelo) 8%, var(--surface-1)); }
+.aud-solta svg { color: var(--text-secondary); }
+.aud-solta-p { padding: 18px; }
+.aud-progresso { display: grid; gap: 6px; font-size: 13px; }
+.aud-barra { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.aud-barra i { display: block; height: 100%; background: var(--pt-amarelo); transition: width 0.3s; }
+.aud-erro { margin: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--critical); color: var(--text-primary); }
+.aud-arquivos { display: grid; gap: 10px; }
+.aud-barra-acoes { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.aud-check { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.aud-check li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.aud-check li.ok svg { color: var(--desce); flex: none; margin-top: 1px; }
+.aud-check li.nok svg { color: var(--sobe); flex: none; margin-top: 1px; }
+.aud-check .cap-sub { display: block; }
+.aud-s { color: var(--desce); font-weight: 800; }
+.aud-n { color: var(--sobe); font-weight: 800; }
+.aud-tudo-ok { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--desce); font-weight: 600; }
+.aud-achado { display: grid; gap: 10px; background: var(--surface-1); border: 1px solid var(--border); border-left: 5px solid var(--border); border-radius: var(--raio-bloco, 16px); padding: 18px 22px; box-shadow: var(--sombra-1); min-width: 0; }
+.aud-achado.c-alta { border-left-color: var(--sobe); }
+.aud-achado.c-media { border-left-color: #c98500; }
+.aud-achado.c-baixa { border-left-color: var(--ganho-texto); }
+.aud-achado.c-ok { border-left-color: var(--desce); }
+.aud-achado header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.aud-achado h3 { margin: 0; font-size: 15px; }
+.aud-achado p { margin: 0; }
+.aud-item { font-weight: 800; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.aud-selo { font-size: 11px; font-weight: 800; letter-spacing: 0.05em; padding: 3px 9px; border-radius: 999px; color: #fff; }
+.aud-selo.alta { background: #b42d2d; }
+.aud-selo.media { background: #8a5a00; }
+.aud-selo.baixa { background: #1c5cab; }
+.aud-selo.info { background: #52525b; }
+.aud-selo.ok { background: #1c6b3a; }
+.aud-rep { display: grid; gap: 4px; max-width: 420px; }
+.aud-resolver { padding: 10px 12px; border-radius: 10px; background: var(--amarelo-suave, rgb(255 215 0 / 0.16)); font-size: 13px; }
+.aud-fonte { font-size: 12px; color: var(--text-secondary); text-decoration: underline; align-self: center; }
+.aud-tabela { display: grid; gap: 8px; min-width: 0; }
+.aud-filtros { display: flex; flex-wrap: wrap; gap: 8px; }
+.aud-filtros input { flex: 1 1 240px; height: 38px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
+.aud-paginas { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+td.aud-longo { white-space: normal; min-width: 280px; }
+.aud-mapa summary, .aud-regra summary { cursor: pointer; font-weight: 600; }
+.aud-regra { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--raio-bloco, 16px); padding: 16px 22px; display: grid; gap: 10px; }
+.aud-grafico text { fill: var(--text-muted); font-size: 11px; }
