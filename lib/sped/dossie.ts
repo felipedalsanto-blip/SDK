@@ -10,6 +10,7 @@ import { FONTES } from "./fontes"
 export type EntradaDossie = {
   resultado: Resultado
   cruzamento?: { achados: Achado[]; resumo: Record<string, number> }
+  conciliacao?: Achado[]
   logo?: string // data URL do logo da PriceTax
   geradoEm: string
 }
@@ -18,7 +19,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 
 export function gerarDossie(e: EntradaDossie): string {
   const r = e.resultado
-  const achados = [...r.achados, ...(e.cruzamento?.achados ?? [])]
+  const achados = [...r.achados, ...(e.conciliacao ?? []), ...(e.cruzamento?.achados ?? [])]
   const contagem = { alta: 0, media: 0, baixa: 0, info: 0, ok: 0 }
   for (const a of achados) contagem[a.criticidade]++
   const fontesUsadas = [...new Set(achados.flatMap((a) => a.fontes ?? []))].map((id) => FONTES[id]).filter(Boolean)
@@ -122,6 +123,7 @@ ${e.logo ? `<img src="${e.logo}" alt="PriceTax" />` : "<b>PriceTax</b>"}
 <section id="s-2"></section>
 <section id="s-3"></section>
 <section id="s-4"></section>
+<section id="s-5"></section>
 <section id="s-micro"><div class="card"><h2>Micro: documento a documento</h2><p class="sub">Todos os casos apontados, com chave, fornecedor/cliente e CFOP. Escolha o achado e busque por qualquer texto.</p>
   <div class="filtro"><select id="m-achado"></select><input id="m-busca" placeholder="Buscar chave, CNPJ, CFOP, NCM, nome…" /><select id="m-reforma"><option value="">Reforma: todos</option><option value="sim">Só CFOPs da reforma</option><option value="não">Só fora da reforma</option></select></div>
   <div id="m-tab"></div></div></section>
@@ -170,7 +172,7 @@ function cartao(a){
   }});
   return c}
 /* abas */
-var ABAS=[['veredito','Veredito'],['1','1 · Documentos enviados'],['2','2 · Acurácia'],['3','3 · Consolidação'],['4','4 · Divergências com a Pricetax'],['micro','Micro (documentos)'],['ajustes','Ajustes e estornos'],['leis','Legislação']];
+var ABAS=[['veredito','Veredito'],['1','1 · Documentos enviados'],['2','2 · Acurácia'],['3','3 · Consolidação'],['4','4 · Divergências com a Pricetax'],['5','5 · Fiscal × Contribuições'],['micro','Micro (documentos)'],['ajustes','Ajustes e estornos'],['leis','Legislação']];
 var nav=document.getElementById('abas');
 function mostrar(id){document.querySelectorAll('section').forEach(function(s){s.classList.toggle('ativa',s.id==='s-'+id)});nav.querySelectorAll('button').forEach(function(b){b.setAttribute('aria-current',b.getAttribute('data-a')===id)});window.scrollTo(0,0)}
 ABAS.forEach(function(x){var b=el('button',{'data-a':x[0]},x[1]);b.onclick=function(){mostrar(x[0])};nav.appendChild(b)});
@@ -193,7 +195,7 @@ nav.querySelector('button').setAttribute('aria-current','true');
   var arq=el('div',{class:'card'},'<h2>Arquivos recebidos</h2>'+tabela({colunas:[{id:'nome',nome:'Arquivo',tipo:'texto'},{id:'tipo',nome:'Tipo',tipo:'texto'},{id:'cnpj',nome:'CNPJ',tipo:'texto'},{id:'periodo',nome:'Competência',tipo:'texto'},{id:'finalidade',nome:'Versão',tipo:'texto'},{id:'linhas',nome:'Linhas',tipo:'num'},{id:'erros',nome:'Linhas com erro',tipo:'num'}],linhas:R.arquivos},'',''));
   s.appendChild(arq)})();
 /* etapas 2, 3 e 4 */
-['2','3','4'].forEach(function(et){var s=document.getElementById('s-'+et);var lista=A.filter(function(a){return a.etapa===et});
+['2','3','4','5'].forEach(function(et){var s=document.getElementById('s-'+et);var lista=A.filter(function(a){return a.etapa===et});
   if(et==='4'&&!lista.length){s.appendChild(el('div',{class:'card'},'<h2>Divergências com o relatório da Pricetax</h2><p>O relatório da Pricetax não foi carregado no painel. Carregue a planilha na aba Auditoria para incluir esta etapa.</p>'));return}
   if(et==='4'&&D.cruzamento){var c=D.cruzamento;s.appendChild(el('div',{class:'kpis'},'<div class="kpi"><span>Documentos no EFD</span><b>'+fm(c.documentosEfd,'num')+'</b><span class="sub">'+fm(c.duplicadosRemovidos,'num')+' em duplicidade Fiscal × Contribuições, unificados</span></div><div class="kpi"><span>Documentos na planilha</span><b>'+fm(c.documentosPricetax,'num')+'</b></div><div class="kpi"><span>Conferem</span><b style="color:var(--ok)">'+fm(c.conferem,'num')+'</b></div><div class="kpi"><span>Total EFD × Pricetax</span><b>'+fm(c.totalPricetax-c.totalEfd,'moeda')+'</b><span class="sub">'+fm(c.totalEfd,'moeda')+' × '+fm(c.totalPricetax,'moeda')+'</span></div>'))}
   lista.forEach(function(a){s.appendChild(cartao(a))})});

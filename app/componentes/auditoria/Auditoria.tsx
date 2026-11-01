@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { analisar, fmtCnpj, fmtMes, moeda, pctTexto, rotuloCrit, type Achado, type Criticidade, type Resultado, type Tabela } from "@/lib/sped/analise"
 import { REGRA_VAZIA, type RegraCfop } from "@/lib/sped/cfop"
+import { conciliar } from "@/lib/sped/conciliacao"
 import { aplicarMapeamento, CAMPOS, cruzar, lerCsv, sugerirMapeamento, type LinhaPricetax } from "@/lib/sped/cruzamento"
 import { gerarDossie, nomeDossie } from "@/lib/sped/dossie"
 import { FONTES } from "@/lib/sped/fontes"
@@ -34,7 +35,7 @@ export function Auditoria() {
   const [regra, setRegra] = useState<RegraCfop>(REGRA_VAZIA)
   const [planilha, setPlanilha] = useState<{ nome: string; linhas: Record<string, unknown>[]; cabecalho: string[] } | null>(null)
   const [mapa, setMapa] = useState<Partial<Record<keyof LinhaPricetax, string>>>({})
-  const [etapa, setEtapa] = useState<"1" | "2" | "3" | "4">("1")
+  const [etapa, setEtapa] = useState<"1" | "2" | "3" | "4" | "5">("1")
   const worker = useRef<Worker | null>(null)
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export function Auditoria() {
 
   const resultado = useMemo(() => (leitura ? analisar(leitura, regra) : null), [leitura, regra])
   const linhasPricetax = useMemo(() => (planilha ? aplicarMapeamento(planilha.linhas, mapa) : []), [planilha, mapa])
+  const conciliacao = useMemo(() => (leitura ? conciliar(leitura, regra) : []), [leitura, regra])
   const cruzamento = useMemo(() => (leitura && linhasPricetax.length ? cruzar(leitura, linhasPricetax, regra) : null), [leitura, linhasPricetax, regra])
 
   const carregarPlanilha = async (arquivo: File | undefined) => {
@@ -116,7 +118,7 @@ export function Auditoria() {
         r.readAsDataURL(b)
       })
     } catch {}
-    const html = gerarDossie({ resultado, cruzamento: cruzamento ?? undefined, logo, geradoEm: new Date().toLocaleString("pt-BR") })
+    const html = gerarDossie({ resultado, cruzamento: cruzamento ?? undefined, conciliacao, logo, geradoEm: new Date().toLocaleString("pt-BR") })
     const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }))
     const a = document.createElement("a")
     a.href = url
@@ -125,7 +127,7 @@ export function Auditoria() {
     setTimeout(() => URL.revokeObjectURL(url), 2000)
   }
 
-  const todos = useMemo(() => [...(resultado?.achados ?? []), ...(cruzamento?.achados ?? [])], [resultado, cruzamento])
+  const todos = useMemo(() => [...(resultado?.achados ?? []), ...conciliacao, ...(cruzamento?.achados ?? [])], [resultado, conciliacao, cruzamento])
   const conta = (c: Criticidade) => todos.filter((a) => a.criticidade === c).length
 
   return (
@@ -211,9 +213,9 @@ export function Auditoria() {
 
           <div className="aud-barra-acoes">
             <nav className="cap-alternar" aria-label="Etapas da auditoria">
-              {(["1", "2", "3", "4"] as const).map((e) => (
+              {(["1", "2", "3", "4", "5"] as const).map((e) => (
                 <button key={e} aria-pressed={etapa === e} onClick={() => setEtapa(e)}>
-                  {e} · {({ "1": "Documentos enviados", "2": "Acurácia", "3": "Consolidação", "4": "Divergências com a Pricetax" } as const)[e]}
+                  {e} · {({ "1": "Documentos enviados", "2": "Acurácia", "3": "Consolidação", "4": "Divergências com a Pricetax", "5": "Fiscal × Contribuições" } as const)[e]}
                 </button>
               ))}
             </nav>
@@ -261,6 +263,15 @@ export function Auditoria() {
                 </details>
               )}
             </Bloco>
+          )}
+          {etapa === "5" && (
+            <>
+              <p className="cap-nota">
+                Cruzamento nota a nota pela chave de acesso entre o EFD ICMS/IPI e o EFD Contribuições (C100, C500 e D100). Os créditos estimados são
+                indicativos (9,25% sobre mercadorias − desconto − ICMS), para priorizar a revisão.
+              </p>
+              {conciliacao.map((a) => <CartaoAchado key={a.id} a={a} />)}
+            </>
           )}
           {etapa === "4" && cruzamento && (
             <>

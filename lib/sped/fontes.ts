@@ -10,6 +10,7 @@ export const FONTES: Record<string, Fonte> = {
   ec132: { id: "ec132", titulo: "Emenda Constitucional 132/2023 (Reforma Tributária)", url: "https://www.planalto.gov.br/ccivil_03/constituicao/emendas/emc/emc132.htm" },
   l10637: { id: "l10637", titulo: "Lei 10.637/2002 (PIS não cumulativo)", url: "https://www.planalto.gov.br/ccivil_03/leis/2002/l10637.htm" },
   l10833: { id: "l10833", titulo: "Lei 10.833/2003 (COFINS não cumulativa)", url: "https://www.planalto.gov.br/ccivil_03/leis/2003/l10.833.htm" },
+  l14592: { id: "l14592", titulo: "Lei 14.592/2023 (ICMS fora da base dos créditos de PIS/COFINS)", url: "https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14592.htm" },
   l10147: { id: "l10147", titulo: "Lei 10.147/2000 (incidência monofásica: farmacêuticos, perfumaria e higiene)", url: "https://www.planalto.gov.br/ccivil_03/leis/l10147.htm" },
   l10485: { id: "l10485", titulo: "Lei 10.485/2002 (incidência monofásica: veículos e autopeças)", url: "https://www.planalto.gov.br/ccivil_03/leis/2002/l10485.htm" },
   l10925: { id: "l10925", titulo: "Lei 10.925/2004 (alíquota zero de insumos agropecuários e crédito presumido da agroindústria)", url: "https://www.planalto.gov.br/ccivil_03/_ato2004-2006/2004/lei/l10.925.htm" },
