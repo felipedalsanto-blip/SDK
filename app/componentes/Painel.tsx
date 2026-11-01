@@ -7,7 +7,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react"
-import { Carregando } from "./capitulos/ui"
+import { Carregando, ValorKpi } from "./capitulos/ui"
 import dynamic from "next/dynamic"
 
 // A auditoria (leitor de EFD, análises e dossiê) só é baixada quando a aba é aberta.
@@ -334,23 +334,6 @@ function Visao({
           sentido={sentido}
           onSentido={setSentido}
           onMenu={() => setMenuAberto(true)}
-          extra={
-            aba === "geral" ? (
-              <>
-                <a className="botao ctx-csv" href={linkExportar(calculo.id, selecao)} download>
-                  <Download aria-hidden="true" size={14} /> CSV
-                </a>
-                {filtro && (
-              <span className="chip">
-                {DIMENSOES_RANKING[filtro.dimensao]}: {rotuloValor(filtro.dimensao, filtro.valor)}
-                <button aria-label="Remover filtro" onClick={() => setFiltro(null)}>
-                  <X aria-hidden="true" size={13} />
-                </button>
-              </span>
-                )}
-              </>
-            ) : null
-          }
         />
         <main id="conteudo">
           {avisos}
@@ -371,6 +354,19 @@ function Visao({
         <NovoProduto calculoId={calculo.id} regime={regime} ano={ano} />
       ) : aba === "geral" ? (
         <>
+          <div className="secao-acoes">
+            {filtro && (
+              <span className="chip">
+                {DIMENSOES_RANKING[filtro.dimensao]}: {rotuloValor(filtro.dimensao, filtro.valor)}
+                <button aria-label="Remover filtro" onClick={() => setFiltro(null)}>
+                  <X aria-hidden="true" size={13} />
+                </button>
+              </span>
+            )}
+            <a className="botao" href={linkExportar(calculo.id, selecao)} download>
+              <Download aria-hidden="true" size={15} /> Baixar CSV do recorte
+            </a>
+          </div>
           <Resumo calculoId={calculo.id} selecao={selecao} chave={chave} />
 
           <div className="grade-2">
@@ -463,9 +459,9 @@ function Resumo({ calculoId, selecao, chave }: { calculoId: string; selecao: Sel
                 <div className="rotulo">
                   {k.rotulo} · depois ({selecao.recorte.ano})
                 </div>
-                <div className="valor">{t ? k.fmt(t[k.dr] as never) : "…"}</div>
+                <div className="valor">{t ? <ValorKpi texto={k.fmt(t[k.dr] as never)} /> : "…"}</div>
                 <div className="antes">
-                  Antes: {t ? k.fmt(t[k.ar] as never) : "…"} {t && <Delta antes={t[k.ar]} depois={t[k.dr]} modo={k.modo} />}
+                  Antes: {t ? <ValorKpi texto={k.fmt(t[k.ar] as never)} /> : "…"} {t && <Delta antes={t[k.ar]} depois={t[k.dr]} modo={k.modo} />}
                 </div>
               </div>
             ))}

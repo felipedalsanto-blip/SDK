@@ -16,7 +16,6 @@ import {
   Scale,
   ShieldCheck,
   ShoppingCart,
-  SlidersHorizontal,
   TrendingUp,
   Trophy,
   Wallet,
@@ -156,18 +155,39 @@ export function MenuLateral({
 
 /* ───────────────────────── Barra de contexto ───────────────────────── */
 
-/** Um filtro da barra: rótulo + controle; desabilitado com o motivo quando não vale para a aba. */
-function Filtro({ rotulo, aplica, children }: { rotulo: string; aplica: Aplica; children: React.ReactNode }) {
+/** Uma pílula de filtro: rótulo discreto + valor em destaque. Desabilitada com o motivo quando não vale para a aba. */
+function Pilula<T extends string | number>({
+  rotulo,
+  aplica,
+  valor,
+  opcoes,
+  onChange,
+  dica,
+}: {
+  rotulo: string
+  aplica: Aplica
+  valor: T
+  opcoes: [T, string][]
+  onChange: (v: T) => void
+  dica?: string
+}) {
   const motivo = aplica === true ? null : aplica
+  const id = `pilula-${rotulo.replace(/\W+/g, "-").toLowerCase()}`
   return (
-    <div className={`ctx-filtro${motivo ? " desabilitado" : ""}`} title={motivo ?? undefined}>
-      <span className="ctx-rotulo">{rotulo}</span>
-      <fieldset disabled={!!motivo} aria-describedby={motivo ? undefined : undefined}>
-        <legend className="sr-only">{rotulo}</legend>
-        {children}
-      </fieldset>
+    <span className={`pilula${motivo ? " desabilitada" : ""}`} title={motivo ? `Não se aplica a esta aba: ${motivo}` : dica}>
+      <label htmlFor={id} className="pilula-rotulo">
+        {rotulo}
+        {motivo && <span aria-hidden> ⊘</span>}
+      </label>
+      <select id={id} value={String(valor)} disabled={!!motivo} onChange={(e) => onChange(opcoes.find(([v]) => String(v) === e.target.value)![0])}>
+        {opcoes.map(([v, nome]) => (
+          <option key={String(v)} value={String(v)}>
+            {nome}
+          </option>
+        ))}
+      </select>
       {motivo && <span className="sr-only">Não se aplica: {motivo}</span>}
-    </div>
+    </span>
   )
 }
 
@@ -189,14 +209,12 @@ export type Contexto = {
   onEstimados: (sem: boolean) => void
   sentido: Sentido
   onSentido: (s: Sentido) => void
-  extra?: React.ReactNode
   onMenu: () => void
 }
 
 export function BarraContexto(c: Contexto) {
   const ap = APLICA[c.aba]
   const [copiado, setCopiado] = useState(false)
-  const [filtrosAbertos, setFiltrosAbertos] = useState(false)
   const copiar = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href)
@@ -204,97 +222,69 @@ export function BarraContexto(c: Contexto) {
       setTimeout(() => setCopiado(false), 1800)
     } catch {}
   }
-  const nomeCen = (id: string) => c.calculo.cenarios.find((x) => x.id === id)?.nome ?? id
-  const resumo = [String(c.ano), REGIMES[c.regime] ?? c.regime, ap.cenario === true ? nomeCen(c.cenarioVendas) : null].filter(Boolean).join(" · ")
+  const cenarios = c.calculo.cenarios.map((x) => [x.id, x.nome] as [string, string])
+  const empresa = c.calculo.empresa ?? c.calculo.nome
   return (
     <header className="ctx" aria-label="Contexto do cálculo">
-      <div className="ctx-linha">
+      <div className="ctx-topo">
         <button className="ctx-menu" onClick={c.onMenu} aria-label="Abrir menu">
           <Menu size={20} aria-hidden />
         </button>
-        <div className="ctx-calculo">
-          <select aria-label="Cálculo" value={c.calculo.id} onChange={(e) => c.onCalculo(e.target.value || null)}>
-            {!c.calculos?.some((x) => x.id === c.calculo.id) && <option value={c.calculo.id}>{c.calculo.nome}</option>}
-            {c.calculos?.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.nome}
-                {x.empresa ? ` — ${x.empresa}` : ""}
-              </option>
-            ))}
-          </select>
-          <span className="ctx-empresa">
-            {[c.calculo.empresa, c.calculo.cnpj && fmtCnpj(c.calculo.cnpj), c.calculo.regime_tributario && `atual: ${REGIMES[c.calculo.regime_tributario]}`]
-              .filter(Boolean)
-              .join(" · ")}
+        <div className="ctx-id">
+          <span className="ctx-empresa" title={empresa}>
+            {empresa}
           </span>
-        </div>
-        <button className="ctx-resumo" onClick={() => setFiltrosAbertos(!filtrosAbertos)} aria-expanded={filtrosAbertos} aria-controls="ctx-filtros">
-          <SlidersHorizontal size={15} aria-hidden /> {resumo}
-        </button>
-        <div id="ctx-filtros" className={`ctx-filtros${filtrosAbertos ? " aberto" : ""}`}>
-          <Filtro rotulo="Ano" aplica={ap.ano}>
-            <select aria-label="Ano" value={c.ano} onChange={(e) => c.onAno(Number(e.target.value))}>
-              {c.anos.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
-          </Filtro>
-          <Filtro rotulo="Regime" aplica={ap.regime}>
-            <select aria-label="Regime simulado" value={c.regime} onChange={(e) => c.onRegime(e.target.value)}>
-              {c.calculo.regimes.map((r) => (
-                <option key={r} value={r}>
-                  {REGIMES[r] ?? r}
-                </option>
-              ))}
-            </select>
-          </Filtro>
-          <Filtro rotulo="Cenário (vendas · compras)" aplica={ap.cenario}>
-            <span className="ctx-par">
-              <select aria-label="Cenário de vendas" value={c.cenarioVendas} onChange={(e) => c.onCenarioVendas(e.target.value)}>
-                {c.calculo.cenarios.map((x) => (
+          <span className="ctx-meta">
+            {c.calculo.cnpj && <span>{fmtCnpj(c.calculo.cnpj)}</span>}
+            {c.calculo.regime_tributario && <span className="ctx-selo">Regime atual: {REGIMES[c.calculo.regime_tributario]}</span>}
+            <label className="ctx-trocar">
+              <span className="sr-only">Cálculo</span>
+              <select aria-label="Cálculo" value={c.calculo.id} onChange={(e) => c.onCalculo(e.target.value || null)}>
+                {!c.calculos?.some((x) => x.id === c.calculo.id) && <option value={c.calculo.id}>{c.calculo.nome}</option>}
+                {c.calculos?.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.nome}
+                    {x.empresa && x.empresa !== x.nome ? ` — ${x.empresa}` : ""}
                   </option>
                 ))}
               </select>
-              <select aria-label="Cenário de compras" value={c.cenarioCompras} onChange={(e) => c.onCenarioCompras(e.target.value)}>
-                {c.calculo.cenarios.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.nome}
-                  </option>
-                ))}
-              </select>
-            </span>
-          </Filtro>
-          <Filtro rotulo="Estimados (IPI e ICMS)" aplica={ap.estimados}>
-            <span className="segmentos" role="group" aria-label="Tributos estimados">
-              <button aria-pressed={!c.semEstimados} onClick={() => c.onEstimados(false)}>
-                Incluir
-              </button>
-              <button aria-pressed={c.semEstimados} onClick={() => c.onEstimados(true)}>
-                Excluir
-              </button>
-            </span>
-          </Filtro>
-          {ap.notas && (
-            <Filtro rotulo="Operação" aplica>
-              <span className="segmentos" role="group" aria-label="Operação">
-                {(["ambas", "saida", "entrada"] as Sentido[]).map((s) => (
-                  <button key={s} aria-pressed={c.sentido === s} onClick={() => c.onSentido(s)}>
-                    {s === "ambas" ? "Todas" : s === "saida" ? "Vendas" : "Compras"}
-                  </button>
-                ))}
-              </span>
-            </Filtro>
-          )}
-          {c.extra}
+            </label>
+          </span>
         </div>
         <button className="ctx-link botao" onClick={copiar} title="Copia o endereço desta visão, com a aba e os filtros">
           {copiado ? <Check size={15} aria-hidden /> : <Link2 size={15} aria-hidden />}
           <span className="ctx-link-texto">{copiado ? "Link copiado" : "Copiar link"}</span>
         </button>
+      </div>
+      <div className="ctx-pilulas" role="group" aria-label="Filtros do cálculo" tabIndex={0}>
+        <Pilula rotulo="Ano" aplica={ap.ano} valor={c.ano} opcoes={c.anos.map((a) => [a, String(a)])} onChange={c.onAno} />
+        <Pilula rotulo="Regime" aplica={ap.regime} valor={c.regime} opcoes={c.calculo.regimes.map((r) => [r, REGIMES[r] ?? r])} onChange={c.onRegime} />
+        <Pilula rotulo="Cenário venda" aplica={ap.cenario} valor={c.cenarioVendas} opcoes={cenarios} onChange={c.onCenarioVendas} />
+        <Pilula rotulo="Cenário compra" aplica={ap.cenario} valor={c.cenarioCompras} opcoes={cenarios} onChange={c.onCenarioCompras} />
+        <Pilula
+          rotulo="Estimados"
+          aplica={ap.estimados}
+          dica="IPI e ICMS estimados na cadeia pela PriceTax (não vieram no documento)."
+          valor={c.semEstimados ? "fora" : "dentro"}
+          opcoes={[
+            ["dentro", "Incluídos"],
+            ["fora", "Excluídos"],
+          ]}
+          onChange={(v) => c.onEstimados(v === "fora")}
+        />
+        {ap.notas && (
+          <Pilula
+            rotulo="Operação"
+            aplica
+            valor={c.sentido}
+            opcoes={[
+              ["ambas", "Todas"],
+              ["saida", "Vendas"],
+              ["entrada", "Compras"],
+            ]}
+            onChange={c.onSentido}
+          />
+        )}
       </div>
       <span className="sr-only" aria-live="polite">
         {copiado ? "Link desta visão copiado." : ""}
