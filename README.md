@@ -32,6 +32,7 @@ tributária, usando o [`@pricetax/sdk`](https://developers-rho-seven.vercel.app/
 
    ```
    PRICETAX_API_KEY=ptc_...           # só no servidor; nunca com prefixo NEXT_PUBLIC_
+   PRICETAX_API_KEY_2=ptc_...         # opcional: outra conta PriceTax (e _3, _4…); a lista junta os cálculos de todas
    PRICETAX_CALCULO_ID=               # opcional: cálculo aberto por padrão
    PAINEL_USUARIO= / PAINEL_SENHA=    # opcional, mas recomendado ao publicar
    ```
