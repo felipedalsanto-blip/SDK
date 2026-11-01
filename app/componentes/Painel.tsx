@@ -3,7 +3,7 @@ import {
   Download,
   FileChartColumn,
   LayoutDashboard,
-  ListChecks,
+  Scale,
   Monitor,
   Moon,
   PackagePlus,
@@ -396,7 +396,7 @@ const ABAS = {
   novo: "Novo produto",
   auditoria: "Auditoria EFD",
   geral: "Visão geral",
-  classificacao: "Classificação CST / cClassTrib",
+  classificacao: "Auditor IVA",
 } as const
 type Aba = keyof typeof ABAS
 const ICONES_ABA: Record<Aba, LucideIcon> = {
@@ -407,7 +407,7 @@ const ICONES_ABA: Record<Aba, LucideIcon> = {
   novo: PackagePlus,
   auditoria: ShieldCheck,
   geral: LayoutDashboard,
-  classificacao: ListChecks,
+  classificacao: Scale,
 }
 
 /** Rótulo visível e, nos seletores, o mesmo nome para leitores de tela. */

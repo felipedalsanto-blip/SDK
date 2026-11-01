@@ -9,6 +9,7 @@ import {
   type Codigo,
   type PontoProjecao,
 } from "@/lib/classificacao"
+import { BarraSaldo, Cascata, Movimentos, Placar, PlanoAcao, SeletorOrdem, ordenar, type Ordem } from "./AuditorIva"
 import { Erro } from "./comum"
 import { escalaBonita } from "./GraficoSerie"
 import { api, fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, fmtPct, useBusca, useLargura } from "./util"
@@ -44,20 +45,25 @@ export function VisaoClassificacao({
       {!a && !analise.erro && <div className="cartao vazio">Comparando as classificações das notas com as calculadas…</div>}
       {a && (
         <div className={analise.carregando ? "carregando" : undefined} style={{ display: "grid", gap: 16 }}>
-          <Indicadores a={a} />
+          <Placar a={a} />
           {a.parcial && (
             <div className="aviso">
               Este recorte tem muitos grupos: os rankings abaixo cobrem os maiores por valor. Os totais acima são
               completos.
             </div>
           )}
+          <div className="grade-2 iva-grade">
+            <Cascata a={a} />
+            <PlanoAcao a={a} />
+          </div>
+          <Movimentos a={a} />
         </div>
       )}
 
       <section className="cartao">
         <div className="cabeca">
           <div>
-            <h2>Projeção ano a ano</h2>
+            <h2>Ganhos e perdas ano a ano</h2>
             <p className="sub">
               Perda e ganho potenciais das divergências em cada ano da transição, com as alíquotas de cada ano.
               Clique num ano para abrir o detalhe.
@@ -75,61 +81,16 @@ export function VisaoClassificacao({
 
       {a && (
         <>
-          <Pares a={a} />
-          <div className="grade-2">
-            <MatrizCst celulas={a.cst} nomes={a.nomesCst} />
-            <Fornecedores a={a} />
-          </div>
           <Itens a={a} />
+          <div className="grade-2">
+            <Fornecedores a={a} />
+            <MatrizCst celulas={a.cst} nomes={a.nomesCst} />
+          </div>
+          <Pares a={a} />
           <Metodologia a={a} />
         </>
       )}
     </>
-  )
-}
-
-function Indicadores({ a }: { a: AnaliseClassificacao }) {
-  const r = a.resumo
-  const classificados = r.porSituacao.conforme.itens + r.porSituacao.divergente.itens
-  const liquido = r.ganho - r.perda
-  return (
-    <div className="kpis">
-      <div className="cartao kpi">
-        <div className="rotulo">Itens divergentes · {a.ano}</div>
-        <div className="valor">{fmtInt(r.porSituacao.divergente.itens)}</div>
-        <div className="antes">
-          {classificados ? fmtPct(r.porSituacao.divergente.itens / classificados) : "—"} dos itens com cClassTrib na nota ·{" "}
-          {fmtBRL(r.porSituacao.divergente.valor)}
-        </div>
-      </div>
-      <div className="cartao kpi">
-        <div className="rotulo">Perda potencial · {a.ano}</div>
-        <div className="valor">{fmtBRL(r.perda)}</div>
-        <div className="antes">Tributo a recolher ou crédito a glosar</div>
-      </div>
-      <div className="cartao kpi">
-        <div className="rotulo">Ganho potencial · {a.ano}</div>
-        <div className="valor">{fmtBRL(r.ganho)}</div>
-        <div className="antes">Tributo pago a mais ou crédito a recuperar</div>
-      </div>
-      <div className="cartao kpi">
-        <div className="rotulo">Impacto líquido · {a.ano}</div>
-        <div className="valor">{fmtBRL(liquido)}</div>
-        <div className="antes">
-          <span className={liquido < 0 ? "perda" : liquido > 0 ? "ganho" : undefined}>
-            {liquido < 0 ? "▼ perda líquida" : liquido > 0 ? "▲ ganho líquido" : "sem efeito"}
-          </span>
-        </div>
-      </div>
-      <div className="cartao kpi">
-        <div className="rotulo">{SITUACOES.sem_nota}</div>
-        <div className="valor">{fmtInt(r.porSituacao.sem_nota.itens)}</div>
-        <div className="antes">
-          {fmtBRL(r.porSituacao.sem_nota.valor)} · fora da comparação
-          {r.naoEstimado.itens > 0 && ` · ${fmtInt(r.naoEstimado.itens)} divergentes sem estimativa`}
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -239,7 +200,7 @@ function Pares({ a }: { a: AnaliseClassificacao }) {
     <section className="cartao">
       <div className="cabeca">
         <div>
-          <h2>cClassTrib: divergências</h2>
+          <h2>Todos os pares de cClassTrib divergentes</h2>
           <p className="sub">Cada par nota → calculado, com o tributo IBS + CBS pelas duas classificações em {a.ano}.</p>
         </div>
       </div>
@@ -286,13 +247,20 @@ function Pares({ a }: { a: AnaliseClassificacao }) {
 }
 
 function Itens({ a }: { a: AnaliseClassificacao }) {
+  const [ordem, setOrdem] = useState<Ordem>("perda")
+  const lista = ordenar(a.itens, ordem)
+  const max = Math.max(0, ...lista.map((x) => Math.abs(x.ganho - x.perda)))
   return (
     <section className="cartao">
       <div className="cabeca">
         <div>
-          <h2>Itens críticos</h2>
-          <p className="sub">Produtos e serviços com maior perda potencial por classificação divergente em {a.ano}.</p>
+          <h2>Itens: ganhos e perdas</h2>
+          <p className="sub">
+            Os produtos e serviços de maior perda com classificação divergente em {a.ano}, com o saldo de cada um.
+            {ordem === "ganho" && !a.itens.some((x) => x.ganho > 0) && " Nenhum deles tem ganho: os ganhos por par estão em “Maiores ganhos”."}
+          </p>
         </div>
+        <SeletorOrdem ordem={ordem} onOrdem={setOrdem} />
       </div>
       {a.itens.length === 0 ? (
         <div className="vazio">Nenhum item divergente.</div>
@@ -307,10 +275,11 @@ function Itens({ a }: { a: AnaliseClassificacao }) {
                 <th className="num">Itens</th>
                 <th className="num">Perda</th>
                 <th className="num">Ganho</th>
+                <th className="num">Saldo</th>
               </tr>
             </thead>
             <tbody>
-              {a.itens.map((it, i) => (
+              {lista.map((it, i) => (
                 <tr key={i}>
                   <td className="texto" title={it.descricao ?? undefined}>
                     {it.descricao ?? "—"}
@@ -322,6 +291,9 @@ function Itens({ a }: { a: AnaliseClassificacao }) {
                   <td className="num">{fmtInt(it.itens)}</td>
                   <td className="num">{it.perda ? <span className="perda">{fmtBRL(it.perda)}</span> : "—"}</td>
                   <td className="num">{it.ganho ? <span className="ganho">{fmtBRL(it.ganho)}</span> : "—"}</td>
+                  <td className="num">
+                    <BarraSaldo perda={it.perda} ganho={it.ganho} max={max} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -333,13 +305,17 @@ function Itens({ a }: { a: AnaliseClassificacao }) {
 }
 
 function Fornecedores({ a }: { a: AnaliseClassificacao }) {
+  const [ordem, setOrdem] = useState<Ordem>("perda")
+  const lista = ordenar(a.fornecedores ?? [], ordem)
+  const max = Math.max(0, ...lista.map((x) => Math.abs(x.ganho - x.perda)))
   return (
     <section className="cartao">
       <div className="cabeca">
         <div>
-          <h2>Fornecedores críticos</h2>
-          <p className="sub">Quem mais emite notas de compra com cClassTrib divergente, por perda potencial em {a.ano}.</p>
+          <h2>Fornecedores: ganhos e perdas</h2>
+          <p className="sub">Quem emite notas de compra com cClassTrib divergente em {a.ano}: glosa em risco ou crédito a recuperar.</p>
         </div>
+        {a.fornecedores && a.fornecedores.length > 0 && <SeletorOrdem ordem={ordem} onOrdem={setOrdem} />}
       </div>
       {a.fornecedores === null ? (
         <div className="vazio">Escolha “Todas” ou “Compras” em Notas para ver os fornecedores.</div>
@@ -355,10 +331,11 @@ function Fornecedores({ a }: { a: AnaliseClassificacao }) {
                 <th className="num">Itens</th>
                 <th className="num">Perda</th>
                 <th className="num">Ganho</th>
+                <th className="num">Saldo</th>
               </tr>
             </thead>
             <tbody>
-              {a.fornecedores.map((f, i) => (
+              {lista.map((f, i) => (
                 <tr key={i}>
                   <td className="texto" title={f.razaoSocial ?? undefined}>
                     {f.razaoSocial ?? "—"}
@@ -370,6 +347,9 @@ function Fornecedores({ a }: { a: AnaliseClassificacao }) {
                   <td className="num">{fmtInt(f.itens)}</td>
                   <td className="num">{f.perda ? <span className="perda">{fmtBRL(f.perda)}</span> : "—"}</td>
                   <td className="num">{f.ganho ? <span className="ganho">{fmtBRL(f.ganho)}</span> : "—"}</td>
+                  <td className="num">
+                    <BarraSaldo perda={f.perda} ganho={f.ganho} max={max} />
+                  </td>
                 </tr>
               ))}
             </tbody>
