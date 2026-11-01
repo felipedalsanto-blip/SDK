@@ -10,7 +10,7 @@ export type Doc = {
   arquivo: number
   fonte: "fiscal" | "contribuicoes"
   estab: string // CNPJ do estabelecimento que escriturou
-  reg: "C100" | "A100"
+  reg: "C100" | "A100" | "C500" | "D100"
   mod: string
   oper: "0" | "1" // 0 entrada, 1 saída
   emit: "0" | "1" // 0 emissão própria, 1 terceiros
@@ -42,6 +42,12 @@ export type Doc = {
   itens: number
   /** Soma dos itens (C170/A170): comparada ao VL_MERC do cabeçalho. */
   somaItens: number
+  /** CSTs de PIS e de COFINS dos itens (C170/C175/A170) e a base de PIS dos itens. */
+  cstPis: string[]
+  cstCofins: string[]
+  bcPis: number
+  /** CSTs de ICMS dos itens (C170) e do analítico (C190). */
+  cstIcms: string[]
   /** Analítico do documento (C190): CST, CFOP e alíquota de ICMS. */
   c190: { cst: string; cfop: string; aliq: number; valor: number; icms: number; st: number; ipi: number }[]
 }

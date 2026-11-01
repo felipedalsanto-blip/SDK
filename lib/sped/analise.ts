@@ -17,7 +17,7 @@ export type Tabela = { colunas: Coluna[]; linhas: Record<string, string | number
 
 export type Achado = {
   id: string
-  etapa: "1" | "2" | "3" | "4"
+  etapa: "1" | "2" | "3" | "4" | "5"
   item: string
   titulo: string
   criticidade: Criticidade

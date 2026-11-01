@@ -163,6 +163,37 @@ export class LeitorEfd {
         this.fecharDoc()
         this.abrirA100(c)
         return
+      case "C500":
+        // Energia elétrica, gás e água. No Contribuições traz a chave (CHV_DOCe) e o PIS/COFINS do crédito.
+        this.fecharDoc()
+        if (this.arq.tipo === "contribuicoes") this.abrirC500(c)
+        return
+      case "C501":
+      case "D101":
+        if (this.doc) {
+          marcarCst(this.doc, reg === "C501" ? c[1] : c[3])
+          if (reg === "D101") this.doc.pis += num(c[7])
+        }
+        return
+      case "C505":
+      case "D105":
+        if (this.doc) {
+          marcarCst(this.doc, undefined, reg === "C505" ? c[1] : c[3])
+          if (reg === "D105") this.doc.cofins += num(c[7])
+        }
+        return
+      case "D190":
+        // Analítico do CT-e no Fiscal: CST, CFOP e ICMS
+        if (this.doc) {
+          if (c[2] && !this.doc.cfops.includes(c[2])) this.doc.cfops.push(c[2])
+          if (c[1] && !this.doc.cstIcms.includes(c[1])) this.doc.cstIcms.push(c[1])
+        }
+        return
+      case "D100":
+        // CT-e (frete): mesmo leiaute nos dois EFDs; o PIS/COFINS do crédito vem no D101/D105.
+        this.fecharDoc()
+        this.abrirD100(c)
+        return
       case "A170":
         this.a170(c)
         return
@@ -280,7 +311,7 @@ export class LeitorEfd {
       part: c[3], partDoc: p?.doc ?? "", partNome: p?.nome ?? "", partUf: p?.uf ?? "",
       vlDoc: num(c[11]), desc: num(c[13]), vlMerc: num(c[15]), frete: num(c[17]), seguro: num(c[18]), outras: num(c[19]),
       bcIcms: num(c[20]), icms: num(c[21]), st: num(c[23]), ipi: num(c[24]), pis: num(c[25]), cofins: num(c[26]),
-      difal: 0, fcp: 0, cfops: [], itens: 0, somaItens: 0, c190: [],
+      difal: 0, fcp: 0, cfops: [], itens: 0, somaItens: 0, c190: [], cstPis: [], cstCofins: [], bcPis: 0, cstIcms: [],
     }
   }
 
@@ -291,7 +322,29 @@ export class LeitorEfd {
       emit: c[2] === "0" ? "0" : "1", sit: c[4], serie: c[5], num: c[7], chave: c[8] ?? "", data: data(c[9]), periodo: this.arq.periodo,
       part: c[3], partDoc: p?.doc ?? "", partNome: p?.nome ?? "", partUf: p?.uf ?? "",
       vlDoc: num(c[11]), desc: num(c[13]), vlMerc: num(c[11]), frete: 0, seguro: 0, outras: 0, bcIcms: 0, icms: 0, st: 0, ipi: 0,
-      pis: num(c[15]), cofins: num(c[17]), difal: 0, fcp: 0, cfops: [], itens: 0, somaItens: 0, c190: [],
+      pis: num(c[15]), cofins: num(c[17]), difal: 0, fcp: 0, cfops: [], itens: 0, somaItens: 0, c190: [], cstPis: [], cstCofins: [], bcPis: 0, cstIcms: [],
+    }
+  }
+
+  private abrirC500(c: string[]) {
+    const p = this.participantes.get(c[1])
+    this.doc = {
+      arquivo: this.arq.indice, fonte: this.fonte, estab: this.estab, reg: "C500", mod: c[2], oper: "0", emit: "1", sit: c[3], serie: c[4],
+      num: c[6], chave: c[14] ?? "", data: data(c[8] || c[7]), periodo: this.arq.periodo, part: c[1], partDoc: p?.doc ?? "",
+      partNome: p?.nome ?? "", partUf: p?.uf ?? "", vlDoc: num(c[9]), desc: 0, vlMerc: num(c[9]), frete: 0, seguro: 0, outras: 0,
+      bcIcms: 0, icms: num(c[10]), st: 0, ipi: 0, pis: num(c[12]), cofins: num(c[13]), difal: 0, fcp: 0, cfops: [], itens: 0,
+      somaItens: 0, c190: [], cstPis: [], cstCofins: [], bcPis: 0, cstIcms: [],
+    }
+  }
+
+  private abrirD100(c: string[]) {
+    const p = this.participantes.get(c[3])
+    this.doc = {
+      arquivo: this.arq.indice, fonte: this.fonte, estab: this.estab, reg: "D100", mod: c[4], oper: c[1] === "1" ? "1" : "0",
+      emit: c[2] === "0" ? "0" : "1", sit: c[5], serie: c[6], num: c[8], chave: c[9] ?? "", data: data(c[10]), periodo: this.arq.periodo,
+      part: c[3], partDoc: p?.doc ?? "", partNome: p?.nome ?? "", partUf: p?.uf ?? "", vlDoc: num(c[14]), desc: num(c[15]),
+      vlMerc: num(c[17]), frete: 0, seguro: 0, outras: 0, bcIcms: num(c[18]), icms: num(c[19]), st: 0, ipi: 0, pis: 0, cofins: 0,
+      difal: 0, fcp: 0, cfops: [], itens: 0, somaItens: 0, c190: [], cstPis: [], cstCofins: [], bcPis: 0, cstIcms: [],
     }
   }
 
@@ -307,6 +360,8 @@ export class LeitorEfd {
       d.itens++
       d.somaItens += num(c[6])
       if (c[10] && !d.cfops.includes(c[10])) d.cfops.push(c[10])
+      marcarCst(d, c[24], c[30], c[9])
+      d.bcPis += num(c[25])
     }
     this.somarItem({
       reg: "C170", cfop: c[10], ncm: prod?.ncm ?? "", codItem: c[2], descricao: prod?.descricao || c[3] || "",
@@ -319,6 +374,10 @@ export class LeitorEfd {
   private c175(c: string[]) {
     const d = this.doc
     if (d && c[1] && !d.cfops.includes(c[1])) d.cfops.push(c[1])
+    if (d) {
+      marcarCst(d, c[4], c[10])
+      d.bcPis += num(c[5])
+    }
     this.somarItem({
       reg: "C175", cfop: c[1], ncm: "", codItem: "", descricao: "NFC-e (analítico C175)", cstIcms: "", aliqIcms: 0, cstIpi: "", aliqIpi: 0,
       cstPis: c[4], aliqPis: num(c[6]), cstCofins: c[10], aliqCofins: num(c[12]), qtd: 0, valor: num(c[2]), desc: num(c[3]), bcIcms: 0,
@@ -332,6 +391,8 @@ export class LeitorEfd {
     if (d) {
       d.itens++
       d.somaItens += num(c[4])
+      marcarCst(d, c[8], c[12])
+      d.bcPis += num(c[9])
     }
     this.somarItem({
       reg: "A170", cfop: "", ncm: prod?.ncm ?? "", codItem: c[2], descricao: prod?.descricao || c[3] || "serviço", cstIcms: "", aliqIcms: 0,
@@ -343,6 +404,7 @@ export class LeitorEfd {
   private c190(c: string[]) {
     const d = this.doc
     if (d && c[2] && !d.cfops.includes(c[2])) d.cfops.push(c[2])
+    if (d && c[1] && !d.cstIcms.includes(c[1])) d.cstIcms.push(c[1])
     d?.c190.push({ cst: c[1], cfop: c[2], aliq: num(c[3]), valor: num(c[4]), icms: num(c[6]), st: num(c[8]), ipi: num(c[10]) })
     const oper = d?.oper ?? (c[2]?.[0] && "567".includes(c[2][0]) ? "1" : "0")
     const k = [this.fonte, this.estab, this.arq.periodo, oper, c[2], c[1], c[3]].join("|")
@@ -417,6 +479,12 @@ export class LeitorEfd {
       aliqCofins: 0, pis: 0, cofins: 0, descricao: "", partDoc: "", ...v,
     })
   }
+}
+
+function marcarCst(d: Doc, pis?: string, cofins?: string, icms?: string) {
+  if (pis && !d.cstPis.includes(pis)) d.cstPis.push(pis)
+  if (cofins && !d.cstCofins.includes(cofins)) d.cstCofins.push(cofins)
+  if (icms && !d.cstIcms.includes(icms)) d.cstIcms.push(icms)
 }
 
 /** E111/E220/E311: o 4º caractere do código é a natureza do ajuste (Tabela 5.1.1). */
