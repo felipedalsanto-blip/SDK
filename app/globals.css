@@ -736,3 +736,51 @@ td.aud-longo { white-space: normal; min-width: 280px; }
 .aud-regra { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--raio-bloco, 16px); padding: 16px 22px; display: grid; gap: 10px; }
 .aud-grafico text { fill: var(--text-muted); font-size: 11px; }
 .aud-cinza { color: var(--text-muted); font-weight: 600; cursor: help; }
+
+/* Auditor IVA: ganho (azul) e perda (vermelho) */
+.iva-placar { display: grid; gap: 16px; }
+.iva-placar-topo { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.iva-placar-topo > div:first-child { flex: 1 1 320px; min-width: 0; }
+.iva-saldo { font-size: clamp(28px, 5vw, 40px); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; margin: 4px 0; }
+.iva-acerto { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.iva-acerto strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.iva-balanca { display: flex; height: 30px; border-radius: 999px; overflow: hidden; background: var(--surface-2); }
+.iva-balanca > div { display: flex; align-items: center; padding: 0 12px; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; transition: width .4s ease; min-width: 0; }
+.iva-balanca-perda { background: color-mix(in srgb, var(--div-perda) 78%, #000); }
+.iva-balanca-ganho { background: color-mix(in srgb, var(--div-ganho) 82%, #000); justify-content: flex-end; }
+.iva-quadrantes { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.iva-quadrante { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; border-top-width: 3px; }
+.iva-quadrante.iva-ganho { border-top-color: var(--div-ganho); }
+.iva-quadrante.iva-perda { border-top-color: var(--div-perda); }
+.iva-quadrante .rotulo { display: flex; gap: 6px; align-items: center; }
+.iva-quadrante-valor { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0; }
+.iva-rodape { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--text-secondary); font-size: 13px; border-top: 1px solid var(--border); padding-top: 12px; }
+.iva-eixo { font-size: 11px; fill: var(--text-secondary); }
+.iva-valor-barra { font-size: 12px; fill: var(--text-primary); font-variant-numeric: tabular-nums; }
+.iva-titulo-icone { display: flex; gap: 8px; align-items: center; }
+.iva-titulo-icone svg.perda { color: var(--div-perda); }
+.iva-titulo-icone svg.ganho { color: var(--div-ganho); }
+.iva-movimentos { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.iva-mov-linha { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.iva-mov-linha .codigo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iva-mov-valor { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.iva-trilho { height: 8px; border-radius: 999px; background: var(--surface-2); margin: 6px 0 4px; overflow: hidden; }
+.iva-barra { display: block; height: 100%; border-radius: 999px; transition: width .4s ease; }
+.iva-barra-perda { background: var(--div-perda); }
+.iva-barra-ganho { background: var(--div-ganho); }
+.iva-plano { display: grid; gap: 12px; }
+.iva-passo { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.iva-passo h3 { margin: 0; font-size: 14px; }
+.iva-passo ul { margin: 6px 0 0; padding-left: 16px; font-size: 13px; display: grid; gap: 2px; }
+.iva-passo li .texto { display: inline; }
+.iva-passo-n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--surface-1); border: 2px solid var(--border); }
+.iva-passo.iva-perda .iva-passo-n { border-color: var(--div-perda); }
+.iva-passo.iva-ganho .iva-passo-n { border-color: var(--div-ganho); }
+.iva-passo-valor { font-weight: 700; font-variant-numeric: tabular-nums; }
+.iva-dica { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+.iva-grade { align-items: start; }
+.iva-saldo-celula { display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.iva-saldo-trilho { position: relative; width: 64px; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.iva-saldo-trilho .iva-barra { position: absolute; top: 0; }
+.iva-saldo-trilho::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) { .iva-balanca > div, .iva-barra { transition: none; } }
