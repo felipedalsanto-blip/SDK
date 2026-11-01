@@ -139,6 +139,24 @@ export function Bloco({ titulo, leitura, children }: { titulo: string; leitura?:
   )
 }
 
+/**
+ * Valor de indicador: a partir de R$ 10 milhões, abrevia (R$ 2,70 bi) e mostra o valor exato no tooltip.
+ * Recebe o texto já formatado ("R$ 2.702.454.066,31"); outros formatos (%, contagens) passam direto.
+ */
+export function ValorKpi({ texto, className }: { texto: string; className?: string }) {
+  const m = texto.match(/^(-?)R\$\s?([\d.]+),(\d{2})$/)
+  const v = m ? Number(m[2].replace(/\./g, "") + "." + m[3]) * (m[1] ? -1 : 1) : null
+  if (v === null || Math.abs(v) < 10_000_000) return <span className={className}>{texto}</span>
+  const abs = Math.abs(v)
+  const [div, suf] = abs >= 1e9 ? [1e9, "bi"] : [1e6, "mi"]
+  const curto = `${v < 0 ? "−" : ""}R$ ${(abs / div).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${suf}`
+  return (
+    <span className={className} title={texto} aria-label={texto}>
+      {curto}
+    </span>
+  )
+}
+
 export function Indicador({ rotulo, valor, contexto, icone: Icone }: { rotulo: string; valor: string; contexto?: React.ReactNode; icone?: LucideIcon }) {
   return (
     <div className="cap-kpi">
@@ -150,7 +168,7 @@ export function Indicador({ rotulo, valor, contexto, icone: Icone }: { rotulo: s
         )}
         {rotulo}
       </span>
-      <span className="cap-kpi-valor">{valor}</span>
+      <ValorKpi className="cap-kpi-valor" texto={valor} />
       {contexto && <span className="cap-kpi-contexto">{contexto}</span>}
     </div>
   )
