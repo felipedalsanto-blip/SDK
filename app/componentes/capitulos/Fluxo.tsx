@@ -4,7 +4,7 @@ import { useState } from "react"
 import type { Estorno } from "@/lib/capitulos"
 import { acharLinha, montarFluxo } from "@/lib/demonstrativos"
 import { Erro } from "../comum"
-import { api, fmtBRL, fmtPct, useBusca } from "../util"
+import { api, useApi, fmtBRL, fmtPct, useBusca } from "../util"
 import type { Trilha } from "@/lib/capitulos"
 import { FormPremissas, porCenario, usePremissasIr, useTrilha } from "./Dre"
 import { EstimadosAnos } from "./Estimados"
@@ -23,13 +23,13 @@ export function Fluxo({
   ano: number
   semEstimados: boolean
 }) {
-  const { dados, erro, carregando } = useTrilha(calculoId, regime, semEstimados)
+  const { dados, erro, carregando, progresso } = useTrilha(calculoId, regime, semEstimados)
   const [premissas, mudarPremissas] = usePremissasIr(calculoId, regime, periodoMeses)
-  const estorno = useBusca((s) => api<Estorno>(`/api/calculos/${calculoId}/capitulos/estorno`, { regime }, s), [calculoId, regime])
+  const estorno = useApi<Estorno>(`/api/calculos/${calculoId}/capitulos/estorno`, { regime })
   const [cenario, setCenario] = useState<string | null>(null)
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <Carregando mensagem="Montando o fluxo de caixa de 2027 a 2033…" />
+  if (!dados) return <Carregando mensagem="Montando o fluxo de caixa de 2027 a 2033…" progresso={progresso} />
 
   const anos = dados.anos
   const escolhido = dados.cenarios.find((c) => c.id === cenario) ?? dados.cenarios.find((c) => c.rotulo === "Com Reajuste") ?? dados.cenarios[0]

@@ -10,7 +10,7 @@ import type { Trilha } from "@/lib/capitulos"
 import { REGIMES } from "@/lib/catalogo"
 import { acharLinha, colunas, montarDre, type PremissasIr } from "@/lib/demonstrativos"
 import { Erro } from "../comum"
-import { api, fmtBRL, fmtPct } from "../util"
+import { buscarMemo, fmtBRL, fmtPct, useProgresso } from "../util"
 import { FormPremissas, usePremissasIr } from "./Dre"
 import { Alternar, Bloco, Capitulo, Carregando, LinhasAno, Premissa } from "./ui"
 
@@ -69,7 +69,7 @@ function useTrilhas(calculoId: string, regimes: string[], semEstimados: boolean)
     ;(async () => {
       for (const r of regimes) {
         try {
-          const t = await api<Trilha>(`/api/calculos/${calculoId}/capitulos/trilha`, { regime: r, semEstimados }, ctl.signal)
+          const t = await buscarMemo<Trilha>(`/api/calculos/${calculoId}/capitulos/trilha`, { regime: r, semEstimados }, ctl.signal)
           if (ctl.signal.aborted) return
           setTrilhas((x) => ({ ...x, [r]: t }))
         } catch (e) {
@@ -103,7 +103,7 @@ export function MelhorRegime({ calculo, ano, semEstimados }: { calculo: CalculoD
   if (erro) return <Erro erro={erro} />
   const prontos = regimes.filter((r) => trilhas[r])
   if (prontos.length < regimes.length) {
-    return <Carregando mensagem={`Montando a DRE de cada regime (${prontos.length} de ${regimes.length})…`} indicadores={3} />
+    return <CarregandoRegimes calculoId={calculo.id} regimes={regimes} prontos={prontos.length} semEstimados={semEstimados} />
   }
 
   const base = trilhas[regimes[0]]
@@ -257,5 +257,17 @@ export function MelhorRegime({ calculo, ano, semEstimados }: { calculo: CalculoD
         compensação de prejuízos, fator R e sublimites do Simples. É uma estimativa para orientar a decisão, não um parecer.
       </Premissa>
     </Capitulo>
+  )
+}
+
+function CarregandoRegimes({ calculoId, regimes, prontos, semEstimados }: { calculoId: string; regimes: string[]; prontos: number; semEstimados: boolean }) {
+  const atual = regimes[prontos]
+  const progresso = useProgresso(`/api/calculos/${calculoId}/capitulos/trilha`, atual ? { regime: atual, semEstimados } : null)
+  return (
+    <Carregando
+      mensagem={`Montando a DRE de cada regime: ${REGIMES[atual] ?? atual} (${prontos + 1} de ${regimes.length})…`}
+      indicadores={3}
+      progresso={progresso}
+    />
   )
 }

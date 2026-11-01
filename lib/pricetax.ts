@@ -1,5 +1,7 @@
 import "server-only" // falha o build se este arquivo for importado num Client Component
 import { PriceTax, PriceTaxErro, type Calculo, type CalculoDetalhe, type Filtros, type Recorte } from "@pricetax/sdk"
+import { AsyncLocalStorage } from "node:async_hooks"
+import { unstable_cache } from "next/cache"
 import { DIMENSOES_RANKING, SENTIDOS, type Sentido } from "./catalogo"
 
 /** Erro do próprio painel (validação), com o mesmo formato de resposta dos erros da API. */
@@ -89,20 +91,59 @@ export function pricetax(): { calculos: Pick<Calculos, "listar" | "obter" | "con
   return {
     calculos: {
       listar: listarTodos,
-      obter: async (id) => (await clienteDe(id)).calculos.obter(id),
-      consultar: async (id, entrada) => (await clienteDe(id)).calculos.consultar(id, entrada),
-      pagina: async (id, entrada) => (await clienteDe(id)).calculos.pagina(id, entrada),
-      exportar: async (id, selecao) => (await clienteDe(id)).calculos.exportar(id, selecao),
+      obter: async (id) => limitar(async () => (await clienteDe(id)).calculos.obter(id)),
+      consultar: async (id, entrada) => limitar(async () => (await clienteDe(id)).calculos.consultar(id, entrada)),
+      pagina: async (id, entrada) => limitar(async () => (await clienteDe(id)).calculos.pagina(id, entrada)),
+      // O stream é lido depois: a vaga só fica presa até a resposta começar.
+      exportar: async (id, selecao) => limitar(async () => (await clienteDe(id)).calculos.exportar(id, selecao)),
     },
   }
 }
 
-// Cache em memória no servidor: poupa o limite de 60 chamadas/min por chave.
+/*
+ * Concorrência: até 6 chamadas à API ao mesmo tempo por instância. O código pode pedir tudo em paralelo
+ * (Promise.all) sem estourar o limite de 60/min de uma vez; o SDK espera e repete quando a API pede (429).
+ */
+const MAX_PARALELO = 6
+let emUso = 0
+const fila: (() => void)[] = []
+async function limitar<T>(f: () => Promise<T>): Promise<T> {
+  if (emUso >= MAX_PARALELO) await new Promise<void>((ok) => fila.push(ok))
+  emUso++
+  try {
+    return await f()
+  } finally {
+    emUso--
+    fila.shift()?.()
+    progresso.getStore()?.passo()
+  }
+}
+
+/** Progresso de uma requisição: quantas chamadas à API já terminaram (e quantas se espera, se souber). */
+export type Progresso = { feito: number; total: number | null; passo: () => void }
+export const progresso = new AsyncLocalStorage<Progresso>()
+
+/*
+ * Cache em dois níveis: memória da instância e, por baixo, o Data Cache do Next (na Vercel, compartilhado
+ * entre as instâncias e os acessos). Assim trocar de aba ou cair noutra instância não refaz as consultas.
+ * Só valores JSON (Map vira lista e volta); streams ficam só na memória (persistir: false).
+ */
 const cache = new Map<string, { expira: number; valor: Promise<unknown> }>()
-export function emCache<T>(chave: string, segundos: number, buscar: () => Promise<T>): Promise<T> {
+const serializar = (v: unknown) => JSON.stringify(v, (_k, x) => (x instanceof Map ? { __mapa: [...x.entries()] } : x))
+const desserializar = (t: string) => JSON.parse(t, (_k, x) => (x && typeof x === "object" && "__mapa" in x ? new Map(x.__mapa) : x))
+const persistivel = () => process.env.PAINEL_SEM_CACHE_PERSISTENTE !== "1"
+
+export function emCache<T>(chave: string, segundos: number, buscar: () => Promise<T>, persistir = true): Promise<T> {
   const atual = cache.get(chave)
   if (atual && atual.expira > Date.now()) return atual.valor as Promise<T>
-  const valor = buscar().catch((e) => {
+  const ler = persistir && persistivel()
+    ? unstable_cache(async () => serializar(await buscar()), ["painel", chave], { revalidate: segundos })().then(
+        (t) => desserializar(t) as T,
+        // Fora do Next (scripts, testes) o Data Cache não existe: busca direto.
+        (e) => (String(e).includes("incrementalCache") ? buscar() : Promise.reject(e)),
+      )
+    : buscar()
+  const valor = ler.catch((e) => {
     cache.delete(chave)
     throw e
   })
@@ -205,4 +246,39 @@ export function rota<C>(handler: (req: Request, ctx: C) => Promise<Response>) {
       return respostaDeErro(e)
     }
   }
+}
+
+/**
+ * Resposta com progresso real: se o navegador pedir `accept: application/x-ndjson`, cada chamada à API
+ * que termina vira uma linha {"p": feitas, "t": total esperado ou null} e a última traz {"r": resultado}
+ * (ou {"e": erro}). Sem esse cabeçalho, responde JSON comum.
+ */
+export async function comProgresso(req: Request, total: number | null, gerar: () => Promise<unknown>): Promise<Response> {
+  if (!(req.headers.get("accept") ?? "").includes("application/x-ndjson")) return Response.json(await gerar())
+  const cod = new TextEncoder()
+  let enviar: (o: unknown) => void = () => {}
+  const corpo = new ReadableStream<Uint8Array>({
+    start(ctl) {
+      enviar = (o) => ctl.enqueue(cod.encode(JSON.stringify(o) + "\n"))
+      const estado: Progresso = {
+        feito: 0,
+        total,
+        passo() {
+          this.feito++
+          enviar({ p: this.feito, t: this.total })
+        },
+      }
+      progresso
+        .run(estado, gerar)
+        .then(
+          (r) => enviar({ r }),
+          async (e) => {
+            const res = respostaDeErro(e)
+            enviar({ e: { status: res.status, ...(await res.json()) } })
+          },
+        )
+        .finally(() => ctl.close())
+    },
+  })
+  return new Response(corpo, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" } })
 }

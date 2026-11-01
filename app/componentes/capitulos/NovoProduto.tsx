@@ -19,7 +19,7 @@ import {
   type Tipo,
 } from "@/lib/precificacao-calculo"
 import { Erro } from "../comum"
-import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
+import { api, useApi, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { PERFIS, Resumo, custo } from "./CustoCliente"
 import { Alternar, Bloco, Capitulo, Carregando, Diferenca, Indicador, LinhasAno, Premissa } from "./ui"
 
@@ -74,10 +74,7 @@ function cheiasDe(d: Precificacao): Entrada["cheias"] {
 }
 
 export function NovoProduto({ calculoId, regime, ano }: { calculoId: string; regime: string; ano: number }) {
-  const { dados, erro } = useBusca(
-    (s) => api<Precificacao>(`/api/calculos/${calculoId}/capitulos/precificacao`, { regime }, s),
-    [calculoId, regime],
-  )
+  const { dados, erro } = useApi<Precificacao>(`/api/calculos/${calculoId}/capitulos/precificacao`, { regime })
   const chave = `pricetax-novo-produto:${calculoId}`
   const [e, setE] = useState<Entrada | null>(null)
 

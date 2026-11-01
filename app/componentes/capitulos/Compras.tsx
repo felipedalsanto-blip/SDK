@@ -3,7 +3,7 @@ import { Building2, Coins, PiggyBank, Receipt, ShoppingCart } from "lucide-react
 import { useState } from "react"
 import type { Compras as Dados, Qualidade, Suspeitos } from "@/lib/capitulos"
 import { Erro } from "../comum"
-import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
+import { api, useApi, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { Explorador } from "./Explorador"
 import { AvisoEstimados } from "./Estimados"
 import { ProvedorFicha } from "./Ficha"
@@ -13,15 +13,12 @@ type Sentido = "aumento" | "reducao"
 const SENTIDOS: Record<Sentido, string> = { aumento: "Quem aumenta", reducao: "Quem reduz" }
 
 export function Compras({ calculoId, regime, ano, semEstimados }: { calculoId: string; regime: string; ano: number; semEstimados: boolean }) {
-  const { dados, erro, carregando } = useBusca(
-    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/compras`, { regime, ano, semEstimados }, s),
-    [calculoId, regime, ano, semEstimados],
-  )
+  const { dados, erro, carregando, progresso } = useApi<Dados>(`/api/calculos/${calculoId}/capitulos/compras`, { regime, ano, semEstimados })
   const [sentido, setSentido] = useState<Sentido>("aumento")
   const [pareto, setPareto] = useState<"fornecedor" | "ncm" | "grupo">("fornecedor")
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <Carregando mensagem={`Lendo as compras de ${ano}…`} />
+  if (!dados) return <Carregando mensagem={`Lendo as compras de ${ano}…`} progresso={progresso} />
   const t = dados.totais
   const sobe = sentido === "aumento"
   const p = dados.pareto
