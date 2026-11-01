@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   Sun,
   TrendingUp,
+  Trophy,
   Wallet,
   X,
   type LucideIcon,
@@ -38,6 +39,7 @@ import { TabelaLinhas } from "./TabelaLinhas"
 import { VisaoClassificacao } from "./VisaoClassificacao"
 import { Compras } from "./capitulos/Compras"
 import { Dre } from "./capitulos/Dre"
+import { MelhorRegime } from "./capitulos/Regime"
 import { Fluxo } from "./capitulos/Fluxo"
 import { NovoProduto } from "./capitulos/NovoProduto"
 import { Vendas } from "./capitulos/Vendas"
@@ -240,7 +242,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
     filtro,
   }
   const chave = JSON.stringify(selecao)
-  const capitulo = aba === "compras" || aba === "vendas" || aba === "dre" || aba === "fluxo" || aba === "novo" || aba === "auditoria"
+  const capitulo = aba === "compras" || aba === "vendas" || aba === "dre" || aba === "fluxo" || aba === "regime" || aba === "novo" || aba === "auditoria"
   const chaveSerie = JSON.stringify({ ...selecao, recorte: { ...selecao.recorte, ano: null } })
 
   return (
@@ -333,7 +335,9 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
           )}
           {capitulo && (
             <p className="sub" style={{ alignSelf: "center", margin: 0 }}>
-              {aba === "dre" || aba === "fluxo"
+              {aba === "regime"
+                ? `Compara todos os regimes simulados no cálculo; ${ano} fica em destaque. O seletor de regime não se aplica.`
+                : aba === "dre" || aba === "fluxo"
                 ? `DRE e fluxo de caixa mostram todos os anos da transição; ${ano} fica em destaque.`
                 : aba === "auditoria"
                   ? "A auditoria usa os EFDs que você carregar; regime e ano não se aplicam."
@@ -373,6 +377,8 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
         <Dre calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} semEstimados={semEstimados} />
       ) : aba === "fluxo" ? (
         <Fluxo calculoId={calculo.id} regime={regime} periodoMeses={calculo.periodo_meses} ano={ano} semEstimados={semEstimados} />
+      ) : aba === "regime" ? (
+        <MelhorRegime calculo={calculo} ano={ano} semEstimados={semEstimados} />
       ) : aba === "auditoria" ? (
         <Auditoria />
       ) : aba === "novo" ? (
@@ -412,6 +418,7 @@ const ABAS = {
   vendas: "Vendas",
   dre: "DRE",
   fluxo: "Fluxo de caixa",
+  regime: "Melhor regime",
   novo: "Novo produto",
   auditoria: "Auditoria EFD",
   geral: "Visão geral",
@@ -423,6 +430,7 @@ const ICONES_ABA: Record<Aba, LucideIcon> = {
   vendas: TrendingUp,
   dre: FileChartColumn,
   fluxo: Wallet,
+  regime: Trophy,
   novo: PackagePlus,
   auditoria: ShieldCheck,
   geral: LayoutDashboard,

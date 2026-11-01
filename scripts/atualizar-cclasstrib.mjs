@@ -45,6 +45,8 @@ for (const c of dados) {
       reducaoIbs: k.PercRedIbs,
       reducaoCbs: k.PercRedCbs,
       fimVigencia: k.DthFimVig,
+      lei: k.TexUrlLegislacao || null,
+      anexo: k.NroAnexo ?? null,
     }
   }
 }
