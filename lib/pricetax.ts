@@ -43,10 +43,18 @@ function todosOsClientes(): PriceTax[] {
 }
 
 /** Lista os cálculos de todas as contas, do mais novo para o mais antigo. Uma conta fora do ar não derruba as outras. */
-async function listarTodos(): Promise<{ calculos: Calculo[] }> {
+export type SituacaoConta = { conta: number; calculos: number; erro?: string }
+
+async function listarTodos(): Promise<{ calculos: Calculo[]; contas: SituacaoConta[] }> {
   const cs = todosOsClientes()
   const respostas = await Promise.allSettled(cs.map((c) => c.calculos.listar()))
   const calculos: Calculo[] = []
+  const contas: SituacaoConta[] = respostas.map((r, i) => {
+    if (r.status === "fulfilled") return { conta: i + 1, calculos: r.value.calculos.length }
+    const e = r.reason
+    const erro = e instanceof PriceTaxErro ? `${e.codigo}: ${e.message}` : e instanceof Error ? e.message : String(e)
+    return { conta: i + 1, calculos: 0, erro }
+  })
   respostas.forEach((r, i) => {
     if (r.status !== "fulfilled") return
     for (const calc of r.value.calculos) {
@@ -58,7 +66,7 @@ async function listarTodos(): Promise<{ calculos: Calculo[] }> {
   const falha = respostas.find((r): r is PromiseRejectedResult => r.status === "rejected")
   if (!calculos.length && falha) throw falha.reason
   calculos.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
-  return { calculos }
+  return { calculos, contas }
 }
 
 /** O cliente da conta dona do cálculo. Com uma chave só, é sempre ela. */

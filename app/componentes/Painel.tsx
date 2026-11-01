@@ -93,7 +93,7 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
     setCalculoId(id)
   }
 
-  const lista = useBusca((s) => api<{ calculos: Calculo[] }>("/api/calculos", undefined, s), [])
+  const lista = useBusca((s) => api<{ calculos: Calculo[]; contas?: { conta: number; calculos: number; erro?: string }[] }>("/api/calculos", undefined, s), [])
   const detalhe = useBusca(
     calculoId ? (s) => api<CalculoDetalhe>(`/api/calculos/${calculoId}`, undefined, s) : null,
     [calculoId],
@@ -134,6 +134,15 @@ export function Painel({ calculoPadrao }: { calculoPadrao: string | null }) {
       </header>
       <main id="conteudo">
         {!calculoId && <EscolherCalculo lista={lista} onEscolher={escolher} />}
+        {calculoId &&
+          lista.dados?.contas
+            ?.filter((c) => c.erro)
+            .map((c) => (
+              <div key={c.conta} className="aviso" role="alert" style={{ marginBottom: 12 }}>
+                A chave da conta {c.conta} ({c.conta === 1 ? "PRICETAX_API_KEY" : `PRICETAX_API_KEY_${c.conta}`}) não respondeu: {c.erro?.replace(/\.$/, "")}. Os cálculos
+                dela não aparecem na lista.
+              </div>
+            ))}
         {calculoId && detalhe.erro != null && <Erro erro={detalhe.erro} />}
         {calculoId && detalhe.carregando && !detalhe.dados && <Carregando mensagem="Carregando o cálculo…" />}
         {calculoId && detalhe.dados && <Visao key={detalhe.dados.id} calculo={detalhe.dados} />}
@@ -146,7 +155,7 @@ function EscolherCalculo({
   lista,
   onEscolher,
 }: {
-  lista: { dados: { calculos: Calculo[] } | null; erro: unknown; carregando: boolean }
+  lista: { dados: { calculos: Calculo[]; contas?: { conta: number; calculos: number; erro?: string }[] } | null; erro: unknown; carregando: boolean }
   onEscolher: (id: string) => void
 }) {
   return (
@@ -154,11 +163,21 @@ function EscolherCalculo({
       <div className="cabeca">
         <div>
           <h2>Escolha um cálculo</h2>
-          <p className="sub">Os cálculos da conta PriceTax desta chave, do mais novo para o mais antigo.</p>
+          <p className="sub">
+            Os cálculos {(lista.dados?.contas?.length ?? 1) > 1 ? `das ${lista.dados!.contas!.length} contas PriceTax configuradas` : "da conta PriceTax desta chave"}, do mais novo para o mais antigo.
+          </p>
         </div>
       </div>
       {lista.erro != null && <Erro erro={lista.erro} />}
       {lista.carregando && <div className="vazio">Carregando…</div>}
+      {lista.dados?.contas
+        ?.filter((c) => c.erro)
+        .map((c) => (
+          <div key={c.conta} className="aviso" role="alert">
+            A chave da conta {c.conta} ({c.conta === 1 ? "PRICETAX_API_KEY" : `PRICETAX_API_KEY_${c.conta}`}) não respondeu: {c.erro?.replace(/\.$/, "")}. Confira a chave na
+            Vercel e faça um novo deploy.
+          </div>
+        ))}
       {lista.dados && lista.dados.calculos.length === 0 && <div className="vazio">Nenhum cálculo nesta conta.</div>}
       <div className="lista-calculos">
         {lista.dados?.calculos.map((c) => (
