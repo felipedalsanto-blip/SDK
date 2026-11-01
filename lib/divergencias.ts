@@ -7,15 +7,18 @@ import type {
   FornecedorCritico,
   ItemCritico,
   ParDivergente,
+  PorTipo,
+  TipoErro,
   PontoProjecao,
   ResumoClassificacao,
   Situacao,
 } from "./classificacao"
 import type { Sentido } from "./catalogo"
-import { CST, FONTE_TABELA, fator, nomeCclass, type Tributo } from "./cclass"
+import { ORDEM_TIPOS } from "./classificacao"
+import { CST, FONTE_TABELA, fator, nomeCclass, tipoDoPar, type Tributo } from "./cclass"
 import { emCache, pricetax } from "./pricetax"
 
-type Grupo = Record<string, string | number | boolean | null>
+export type Grupo = Record<string, string | number | boolean | null>
 
 const METRICAS = ["itens", "valor_dr", "valor_sem_iva_dr", "valor_ibs_dr", "valor_cbs_dr"] as const satisfies readonly Metrica[]
 const LIMITE = 500
@@ -51,38 +54,44 @@ function aliquotasCheias(grupos: Grupo[]): Record<Tributo, number | null> {
 }
 
 /** Tributo pela nota × tributo correto num grupo divergente. */
-function estimar(g: Grupo, sentido: "entrada" | "saida", cheias: Record<Tributo, number | null>): Estimativa | null {
+export type EstimativaDetalhada = Estimativa & { porTributo: Record<Tributo, { nota: number; correto: number }> }
+
+export function estimar(g: Grupo, sentido: "entrada" | "saida", cheias: Record<Tributo, number | null>): EstimativaDetalhada | null {
   const nota = texto(g.cclass_nota)
   const calculado = texto(g.cclass_calculado)
   let correto = 0
   let pelaNota = 0
+  const porTributo = {} as Record<Tributo, { nota: number; correto: number }>
   for (const t of ["ibs", "cbs"] as const) {
     const fn = fator(nota, t)
     const fc = fator(calculado, t)
     if (fn === null || fc === null) return null
     const valor = n(g[`valor_${t}_dr`])
-    correto += valor
-    if (fc > 0) pelaNota += (valor * fn) / fc
-    else if (fn === 0) pelaNota += 0
+    let v: number
+    if (fc > 0) v = (valor * fn) / fc
+    else if (fn === 0) v = 0
     else if (cheias[t] === null) return null
-    else pelaNota += n(g.valor_sem_iva_dr) * cheias[t]! * fn
+    else v = n(g.valor_sem_iva_dr) * cheias[t]! * fn
+    correto += valor
+    pelaNota += v
+    porTributo[t] = { nota: v, correto: valor }
   }
   const diferenca = pelaNota - correto
   // Venda: a nota destacar menos que o correto é tributo a recolher (perda); a mais, recuperável (ganho).
   // Compra: crédito a maior que o correto é risco de glosa (perda); a menor, crédito a recuperar (ganho).
-  return { correto, pelaNota, impacto: sentido === "saida" ? diferenca : -diferenca }
+  return { correto, pelaNota, impacto: sentido === "saida" ? diferenca : -diferenca, porTributo }
 }
 
-const sentidoDe = (g: Grupo, padrao: Sentido) =>
+export const sentidoDe = (g: Grupo, padrao: Sentido) =>
   (g.tipo_movimentacao === "entrada" || g.tipo_movimentacao === "saida" ? g.tipo_movimentacao : padrao === "entrada" ? "entrada" : "saida") as
     | "entrada"
     | "saida"
 
 const rotuloPar = (g: Grupo) => `${texto(g.cclass_nota)} → ${texto(g.cclass_calculado)}`
 
-type Base = { recorte: Recorte; sentido: Sentido; filtros?: Filtros }
+export type Base = { recorte: Recorte; sentido: Sentido; filtros?: Filtros }
 
-function consultarPares(id: string, base: Base) {
+export function consultarPares(id: string, base: Base) {
   const entrada = {
     ...base,
     agrupar_por: ["tipo_movimentacao", "cclass_nota", "cclass_calculado"] as const,
@@ -95,7 +104,7 @@ function consultarPares(id: string, base: Base) {
   )
 }
 
-function analisarPares(grupos: Grupo[], sentido: Sentido) {
+export function analisarPares(grupos: Grupo[], sentido: Sentido) {
   const cheias = aliquotasCheias(grupos)
   const vazio = () => ({ itens: 0, valor: 0 })
   const resumo: ResumoClassificacao = {
@@ -105,6 +114,7 @@ function analisarPares(grupos: Grupo[], sentido: Sentido) {
     perda: 0,
     ganho: 0,
     naoEstimado: vazio(),
+    porTipo: Object.fromEntries(ORDEM_TIPOS.map((t) => [t, { itens: 0, valor: 0, perda: 0, ganho: 0, pares: 0 }])) as Record<TipoErro, PorTipo>,
   }
   const pares: ParDivergente[] = []
   for (const g of grupos) {
@@ -119,6 +129,15 @@ function analisarPares(grupos: Grupo[], sentido: Sentido) {
 
     const sent = sentidoDe(g, sentido)
     const estimativa = estimar(g, sent, cheias)
+    const tipo = tipoDoPar(texto(g.cclass_nota), texto(g.cclass_calculado))
+    const pt = resumo.porTipo[tipo]
+    pt.itens += itens
+    pt.valor += valor
+    pt.pares += 1
+    if (estimativa) {
+      pt.perda += Math.max(0, -estimativa.impacto)
+      pt.ganho += Math.max(0, estimativa.impacto)
+    }
     if (estimativa) {
       resumo.perda += Math.max(0, -estimativa.impacto)
       resumo.ganho += Math.max(0, estimativa.impacto)
@@ -128,11 +147,13 @@ function analisarPares(grupos: Grupo[], sentido: Sentido) {
     }
     pares.push({
       sentido: sent,
+      tipo,
+      cfops: [],
       nota: { codigo: texto(g.cclass_nota), nome: nomeCclass(texto(g.cclass_nota)) },
       calculado: { codigo: texto(g.cclass_calculado), nome: nomeCclass(texto(g.cclass_calculado)) },
       itens,
       valor,
-      estimativa,
+      estimativa: estimativa && { correto: estimativa.correto, pelaNota: estimativa.pelaNota, impacto: estimativa.impacto },
     })
   }
   pares.sort((a, b) => (a.estimativa?.impacto ?? 0) - (b.estimativa?.impacto ?? 0) || b.valor - a.valor)
@@ -140,26 +161,37 @@ function analisarPares(grupos: Grupo[], sentido: Sentido) {
 }
 
 /** Soma perda e ganho por uma chave (produto, fornecedor), só nos grupos divergentes. */
-function agregar<T extends { itens: number; valor: number; perda: number; ganho: number; pares: string[] }>(
+function agregar<T extends { itens: number; valor: number; perda: number; ganho: number; pares: string[]; porTipo: Partial<Record<TipoErro, PorTipo>>; cfops: string[] }>(
   grupos: Grupo[],
   sentido: Sentido,
   cheias: Record<Tributo, number | null>,
   chave: (g: Grupo) => string,
-  novo: (g: Grupo) => Omit<T, "itens" | "valor" | "perda" | "ganho" | "pares">,
+  novo: (g: Grupo) => Omit<T, "itens" | "valor" | "perda" | "ganho" | "pares" | "porTipo" | "cfops">,
 ): T[] {
   const mapa = new Map<string, T>()
   for (const g of grupos) {
     if (situacao(texto(g.cclass_nota), texto(g.cclass_calculado)) !== "divergente") continue
     const k = chave(g)
-    const atual = mapa.get(k) ?? ({ ...novo(g), itens: 0, valor: 0, perda: 0, ganho: 0, pares: [] } as unknown as T)
+    const atual = mapa.get(k) ?? ({ ...novo(g), itens: 0, valor: 0, perda: 0, ganho: 0, pares: [], porTipo: {}, cfops: [] } as unknown as T)
     const e = estimar(g, sentidoDe(g, sentido), cheias)
+    const tipo = tipoDoPar(texto(g.cclass_nota), texto(g.cclass_calculado))
+    const pt = (atual.porTipo[tipo] ??= { itens: 0, valor: 0, perda: 0, ganho: 0, pares: 0 })
     atual.itens += n(g.itens)
     atual.valor += n(g.valor_dr)
+    pt.itens += n(g.itens)
+    pt.valor += n(g.valor_dr)
     if (e) {
       atual.perda += Math.max(0, -e.impacto)
       atual.ganho += Math.max(0, e.impacto)
+      pt.perda += Math.max(0, -e.impacto)
+      pt.ganho += Math.max(0, e.impacto)
     }
-    if (!atual.pares.includes(rotuloPar(g))) atual.pares.push(rotuloPar(g))
+    const cfop = texto(g.cfop)
+    if (cfop && !atual.cfops.includes(cfop)) atual.cfops.push(cfop)
+    if (!atual.pares.includes(rotuloPar(g))) {
+      atual.pares.push(rotuloPar(g))
+      pt.pares += 1
+    }
     mapa.set(k, atual)
   }
   return [...mapa.values()].sort((a, b) => b.perda - a.perda || b.ganho - a.ganho || b.valor - a.valor)
@@ -214,13 +246,36 @@ export async function analisarClassificacao(id: string, base: Base): Promise<Ana
       (g) => ({ sentido: sentidoDe(g, base.sentido), descricao: texto(g.descricao_produto) }),
     ).slice(0, 15)
 
+    // CFOPs de cada par e de cada item: a consulta de cima já usa as 4 dimensões, então é outra.
+    const cfops = await emCache(`cclass-cfops:${id}:${JSON.stringify({ ...base, filtros })}`, 600, () =>
+      api.consultar(id, {
+        ...base,
+        filtros,
+        agrupar_por: ["descricao_produto", "cclass_nota", "cclass_calculado", "cfop"],
+        metricas: ["itens", "valor_dr"],
+        ordenar_por: { metrica: "valor_dr", direcao: "desc" },
+        limite: LIMITE,
+      }),
+    )
+    const juntar = (lista: string[], v: string | null) => {
+      if (v && !lista.includes(v) && lista.length < 8) lista.push(v)
+    }
+    for (const g of cfops.grupos) {
+      const cfop = texto(g.cfop)
+      const sent = cfop && /^[123]/.test(cfop) ? "entrada" : cfop && /^[567]/.test(cfop) ? "saida" : null
+      for (const p of divergentes)
+        if (p.nota.codigo === texto(g.cclass_nota) && p.calculado.codigo === texto(g.cclass_calculado) && (!sent || p.sentido === sent)) juntar(p.cfops, cfop)
+      for (const it of itens)
+        if (it.descricao === texto(g.descricao_produto) && it.pares.includes(rotuloPar(g)) && (!sent || it.sentido === sent)) juntar(it.cfops, cfop)
+    }
+
     if (fornecedores) {
       const compras = await emCache(`cclass-fornecedores:${id}:${JSON.stringify({ ...base, filtros })}`, 600, () =>
         api.consultar(id, {
           ...base,
           sentido: "entrada",
           filtros,
-          agrupar_por: ["cnpj_outra_parte", "cclass_nota", "cclass_calculado"],
+          agrupar_por: ["cnpj_outra_parte", "cclass_nota", "cclass_calculado", "cfop"],
           metricas: [...METRICAS],
           ordenar_por: { metrica: "valor_dr", direcao: "desc" },
           limite: LIMITE,

@@ -737,50 +737,156 @@ td.aud-longo { white-space: normal; min-width: 280px; }
 .aud-grafico text { fill: var(--text-muted); font-size: 11px; }
 .aud-cinza { color: var(--text-muted); font-weight: 600; cursor: help; }
 
-/* Auditor IVA: ganho (azul) e perda (vermelho) */
-.iva-placar { display: grid; gap: 16px; }
-.iva-placar-topo { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-.iva-placar-topo > div:first-child { flex: 1 1 320px; min-width: 0; }
-.iva-saldo { font-size: clamp(28px, 5vw, 40px); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; margin: 4px 0; }
-.iva-acerto { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
-.iva-acerto strong { font-size: 20px; font-variant-numeric: tabular-nums; }
-.iva-balanca { display: flex; height: 30px; border-radius: 999px; overflow: hidden; background: var(--surface-2); }
-.iva-balanca > div { display: flex; align-items: center; padding: 0 12px; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; transition: width .4s ease; min-width: 0; }
-.iva-balanca-perda { background: color-mix(in srgb, var(--div-perda) 78%, #000); }
-.iva-balanca-ganho { background: color-mix(in srgb, var(--div-ganho) 82%, #000); justify-content: flex-end; }
-.iva-quadrantes { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-.iva-quadrante { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; border-top-width: 3px; }
-.iva-quadrante.iva-ganho { border-top-color: var(--div-ganho); }
-.iva-quadrante.iva-perda { border-top-color: var(--div-perda); }
-.iva-quadrante .rotulo { display: flex; gap: 6px; align-items: center; }
-.iva-quadrante-valor { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0; }
-.iva-rodape { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--text-secondary); font-size: 13px; border-top: 1px solid var(--border); padding-top: 12px; }
+/* Auditor IVA: vermelho = perda/risco, verde = oportunidade, cinza = sem estimativa */
+:root {
+  --iva-perda: #c93434; --iva-perda-texto: #a12626;
+  --iva-oport: #1f8a4c; --iva-oport-texto: #17703c;
+  --iva-cinza: #8a8f98; --iva-cinza-texto: #5d6370;
+  --iva-t-beneficio_indevido: #7f1d1d; --iva-t-redutor: #b91c1c; --iva-t-beneficio_nao_aplicado: #c2410c; --iva-t-classificacao: #57534e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --iva-perda: #e05d5d; --iva-perda-texto: #f39b9b;
+    --iva-oport: #3fb46f; --iva-oport-texto: #6fd69a;
+    --iva-cinza: #6b7280; --iva-cinza-texto: #a3a9b4;
+  }
+}
+:root[data-theme="dark"] {
+  --iva-perda: #e05d5d; --iva-perda-texto: #f39b9b;
+  --iva-oport: #3fb46f; --iva-oport-texto: #6fd69a;
+  --iva-cinza: #6b7280; --iva-cinza-texto: #a3a9b4;
+}
+.iva { display: grid; gap: 16px; --div-ganho: var(--iva-oport); --div-perda: var(--iva-perda); }
+.iva .perda { color: var(--iva-perda-texto); font-weight: 600; font-variant-numeric: tabular-nums; }
+.oport, .iva .ganho { color: var(--iva-oport-texto); font-weight: 600; font-variant-numeric: tabular-nums; }
+.iva-sem { color: var(--iva-cinza-texto); font-style: italic; }
+.iva-termo { display: inline-flex; align-items: center; gap: 3px; cursor: help; border-bottom: 1px dotted var(--text-muted); }
+.iva-termo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.iva-selo { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary); white-space: nowrap; }
+.iva-resumo { display: grid; gap: 16px; }
+.iva-tres { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.iva-numero { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; border-top: 4px solid var(--iva-cinza); }
+.iva-numero.iva-perda { border-top-color: var(--iva-perda); }
+.iva-numero.iva-oport { border-top-color: var(--iva-oport); }
+.iva-numero > strong { font-size: clamp(24px, 4vw, 32px); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.iva-saldo-linha { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; font-size: 15px; }
+.iva-barra-tipos { display: grid; gap: 8px; }
+.iva-barra-tipos-cabeca { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.iva-barra-tipos h3 { margin: 0; font-size: 14px; }
+.iva-pilha { display: flex; height: 34px; border-radius: 10px; overflow: hidden; gap: 2px; background: var(--surface-2); }
+.iva-pilha-seg { border: 0; min-width: 6px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .15s ease, filter .15s ease; }
+.iva-pilha-seg:hover { filter: brightness(1.12); }
+.iva-pilha:has([aria-pressed="true"]) .iva-pilha-seg:not([aria-pressed="true"]) { opacity: .35; }
+.iva-pilha-seg:focus-visible, .iva-leg:focus-visible, .iva-tipo-corpo:focus-visible, .iva-mov:focus-visible, .iva-clicavel:focus-visible, .iva-ordenar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.iva-seg-beneficio_indevido { background: var(--iva-t-beneficio_indevido); }
+.iva-seg-redutor { background: var(--iva-t-redutor); }
+.iva-seg-beneficio_nao_aplicado { background: var(--iva-t-beneficio_nao_aplicado); }
+.iva-seg-classificacao { background: var(--iva-t-classificacao); }
+.iva-legenda-tipos { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 12.5px; }
+.iva-leg { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: none; color: inherit; cursor: pointer; padding: 2px 6px; border-radius: 8px; font: inherit; }
+.iva-leg[aria-pressed="true"] { border-color: var(--border); background: var(--surface-2); font-weight: 600; }
+.iva-leg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.iva-qualidade { display: grid; grid-template-columns: auto minmax(200px, 2fr) repeat(3, minmax(110px, 1fr)); gap: 12px 18px; align-items: center; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface-2); }
+.iva-qualidade-alerta { border-color: var(--warning-border); background: var(--warning-bg); }
+.iva-qualidade-titulo, .iva-qualidade-num { display: grid; gap: 2px; }
+.iva-qualidade-num strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .iva-qualidade { grid-template-columns: 1fr 1fr; } .iva-qualidade > svg { display: none; } .iva-qualidade-titulo { grid-column: 1 / -1; } }
+.iva-tipos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.iva-tipo { display: grid; grid-template-rows: 1fr auto; border: 1px solid var(--border); border-left: 4px solid var(--iva-cinza); border-radius: 12px; overflow: hidden; }
+.iva-tipo.ativo { box-shadow: 0 0 0 2px var(--accent); }
+.iva-tipo-corpo { display: grid; gap: 6px; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 12px 14px; cursor: pointer; }
+.iva-tipo-corpo:hover { background: var(--surface-2); }
+.iva-tipo-nome { font-weight: 600; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.iva-tipo-valores { display: flex; gap: 14px; flex-wrap: wrap; font-size: 18px; }
+.iva-tipo-desc { font-size: 12px; }
+.iva-ver { margin: 0 14px 12px; justify-self: start; }
+.iva-borda-beneficio_indevido { border-left-color: var(--iva-t-beneficio_indevido); }
+.iva-borda-redutor { border-left-color: var(--iva-t-redutor); }
+.iva-borda-beneficio_nao_aplicado { border-left-color: var(--iva-t-beneficio_nao_aplicado); }
+.iva-borda-classificacao { border-left-color: var(--iva-t-classificacao); }
+.iva-borda-dados { border-left-color: var(--pt-amarelo, #f5c400); }
+.iva-linha-discreta { color: var(--text-secondary); font-size: 13px; margin: 6px 0 0; }
+.iva-chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-right: 4px; white-space: nowrap; background: var(--surface-2); border: 1px solid var(--border); }
+.iva-chip-beneficio_indevido { color: var(--iva-t-beneficio_indevido); border-color: color-mix(in srgb, var(--iva-t-beneficio_indevido) 40%, transparent); background: color-mix(in srgb, var(--iva-t-beneficio_indevido) 8%, transparent); }
+.iva-chip-redutor { color: var(--iva-t-redutor); border-color: color-mix(in srgb, var(--iva-t-redutor) 40%, transparent); background: color-mix(in srgb, var(--iva-t-redutor) 8%, transparent); }
+.iva-chip-beneficio_nao_aplicado { color: #9a3412; border-color: color-mix(in srgb, var(--iva-t-beneficio_nao_aplicado) 40%, transparent); background: color-mix(in srgb, var(--iva-t-beneficio_nao_aplicado) 8%, transparent); }
+.iva-chip-classificacao { color: var(--iva-t-classificacao); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .iva-chip { color: var(--text-primary); } }
+:root[data-theme="dark"] .iva-chip { color: var(--text-primary); }
+.iva-cfops { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.iva-cfop-alerta { color: #9a6700; font-weight: 700; }
+.iva-fp { display: inline-flex; gap: 3px; align-items: center; font-size: 11px; font-weight: 600; color: var(--text-primary); background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
 .iva-eixo { font-size: 11px; fill: var(--text-secondary); }
 .iva-valor-barra { font-size: 12px; fill: var(--text-primary); font-variant-numeric: tabular-nums; }
 .iva-titulo-icone { display: flex; gap: 8px; align-items: center; }
-.iva-titulo-icone svg.perda { color: var(--div-perda); }
-.iva-titulo-icone svg.ganho { color: var(--div-ganho); }
-.iva-movimentos { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.iva-titulo-icone svg.perda { color: var(--iva-perda); }
+.iva-titulo-icone svg.oport { color: var(--iva-oport); }
+.iva-movimentos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.iva-mov { display: grid; gap: 4px; width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 8px; border-radius: 10px; cursor: pointer; }
+.iva-mov:hover { background: var(--surface-2); }
 .iva-mov-linha { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .iva-mov-linha .codigo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.iva-mov-valor { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.iva-trilho { height: 8px; border-radius: 999px; background: var(--surface-2); margin: 6px 0 4px; overflow: hidden; }
+.iva-mov-valor { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
+.iva-mov-valor.perda { color: var(--iva-perda-texto); }
+.iva-mov-valor.oport { color: var(--iva-oport-texto); }
+.iva-trilho { display: block; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .iva-barra { display: block; height: 100%; border-radius: 999px; transition: width .4s ease; }
-.iva-barra-perda { background: var(--div-perda); }
-.iva-barra-ganho { background: var(--div-ganho); }
-.iva-plano { display: grid; gap: 12px; }
-.iva-passo { display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
-.iva-passo h3 { margin: 0; font-size: 14px; }
-.iva-passo ul { margin: 6px 0 0; padding-left: 16px; font-size: 13px; display: grid; gap: 2px; }
-.iva-passo li .texto { display: inline; }
-.iva-passo-n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--surface-1); border: 2px solid var(--border); }
-.iva-passo.iva-perda .iva-passo-n { border-color: var(--div-perda); }
-.iva-passo.iva-ganho .iva-passo-n { border-color: var(--div-ganho); }
-.iva-passo-valor { font-weight: 700; font-variant-numeric: tabular-nums; }
+.iva-barra-perda { background: var(--iva-perda); }
+.iva-barra-oport { background: var(--iva-oport); }
+.iva-acoes { display: grid; gap: 10px; }
+.iva-acao { display: grid; gap: 6px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); border-left: 4px solid var(--iva-cinza); }
+.iva-acao h3 { margin: 0; font-size: 14px; }
+.iva-acao-topo { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.iva-resp { font-size: 12px; color: var(--text-secondary); }
+.iva-acao-num { font-size: 16px; font-variant-numeric: tabular-nums; }
+.iva-acao-botoes { display: flex; gap: 8px; flex-wrap: wrap; }
 .iva-dica { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
 .iva-grade { align-items: start; }
 .iva-saldo-celula { display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end; }
 .iva-saldo-trilho { position: relative; width: 64px; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .iva-saldo-trilho .iva-barra { position: absolute; top: 0; }
 .iva-saldo-trilho::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--text-muted); }
-@media (prefers-reduced-motion: reduce) { .iva-balanca > div, .iva-barra { transition: none; } }
+.iva-clicavel { cursor: pointer; }
+.iva-clicavel:hover td { background: var(--surface-2); }
+.iva-tabela td.num, .iva-tabela th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.iva-ordenar { background: none; border: 0; color: inherit; font: inherit; font-weight: 600; cursor: pointer; padding: 0; text-transform: inherit; letter-spacing: inherit; }
+.iva-fixa { max-height: 560px; overflow: auto; }
+.iva-fixa thead th { position: sticky; top: 0; background: var(--surface-1); z-index: 1; }
+@media (max-width: 720px) {
+  .iva-tabela { margin: 0; padding: 0; max-height: none; }
+  .iva-tabela table, .iva-tabela tbody { display: block; }
+  .iva-tabela thead { display: none; }
+  .iva-tabela tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 12px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 12px; }
+  .iva-tabela td { display: grid; gap: 2px; padding: 0; border: 0; max-width: none; text-align: left !important; white-space: normal; }
+  .iva-tabela td::before { content: attr(data-rotulo); font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .iva-tabela td.texto, .iva-tabela td[data-rotulo="Nota"], .iva-tabela td[data-rotulo="Correto"] { grid-column: 1 / -1; }
+  .iva-saldo-celula { justify-content: flex-start; }
+}
+/* Gaveta lateral */
+.iva-gaveta-fundo { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 50; display: flex; justify-content: flex-end; animation: iva-fade .15s ease; }
+.iva-gaveta { width: min(680px, 100vw); height: 100%; overflow: auto; background: var(--surface-1); color: var(--text-primary); padding: 20px; box-shadow: -12px 0 32px rgba(0, 0, 0, .25); display: grid; gap: 14px; align-content: start; animation: iva-entra .2s ease; outline: none; }
+.iva-gaveta-cabeca { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; position: sticky; top: -20px; background: var(--surface-1); padding: 4px 0 10px; z-index: 2; border-bottom: 1px solid var(--border); }
+.iva-gaveta-cabeca h2 { margin: 0; font-size: 18px; }
+.iva-gaveta-acoes { display: flex; gap: 8px; }
+.iva-notas { display: grid; gap: 10px; }
+.iva-nota { border: 1px solid var(--border); border-radius: 12px; }
+.iva-nota-fp { border-color: var(--warning-border); }
+.iva-nota > summary { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 12px 14px; cursor: pointer; list-style: none; }
+.iva-nota > summary::-webkit-details-marker { display: none; }
+.iva-nota > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
+.iva-nota-id { display: grid; gap: 2px; flex: 1 1 200px; }
+.iva-nota-impacto { margin-left: auto; font-size: 15px; }
+.iva-nota-corpo { padding: 0 14px 14px; display: grid; gap: 10px; }
+.iva-comparar { width: 100%; }
+.iva-comparar th[scope="row"] { text-align: left; font-weight: 500; color: var(--text-secondary); }
+.iva-comparar td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.iva-dif th, .iva-dif td { border-top: 2px solid var(--border); font-weight: 600; }
+.iva-fundamento a { display: inline-flex; gap: 4px; align-items: center; font-weight: 600; }
+.iva-nota-itens { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.iva-nota-itens li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; }
+.iva-nota-itens .num { font-variant-numeric: tabular-nums; }
+.iva-chave .codigo { word-break: break-all; }
+.botao-link { background: none; border: 0; color: var(--accent-texto, var(--text-primary)); text-decoration: underline; cursor: pointer; font: inherit; padding: 0; }
+@keyframes iva-fade { from { opacity: 0; } }
+@keyframes iva-entra { from { transform: translateX(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .iva-barra, .iva-pilha-seg { transition: none; } .iva-gaveta, .iva-gaveta-fundo { animation: none; } }
