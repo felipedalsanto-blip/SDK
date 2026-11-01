@@ -910,3 +910,12 @@ td.aud-longo { white-space: normal; min-width: 280px; }
 .rg-ano-atual { box-shadow: 0 0 0 2px var(--pt-amarelo, #f5c400); }
 .rg-ano { font-weight: 700; font-variant-numeric: tabular-nums; }
 .rg-chip { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 2px solid var(--border); white-space: nowrap; }
+
+/* Progresso real das consultas */
+.progresso { display: grid; gap: 6px; margin-bottom: 14px; }
+.progresso-trilho { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; position: relative; }
+.progresso-trilho > span { position: absolute; inset: 0 auto 0 0; background: var(--pt-amarelo, #f5c400); border-radius: 999px; transition: width .3s ease; }
+.progresso-indeterminado { width: 30%; animation: progresso-vai 1.2s ease-in-out infinite; }
+.progresso-texto { font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+@keyframes progresso-vai { from { left: -30%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .progresso-indeterminado { animation: none; width: 100%; opacity: .4; } .progresso-trilho > span { transition: none; } }

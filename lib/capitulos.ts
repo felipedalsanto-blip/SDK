@@ -278,15 +278,33 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
   const ano = anoAcao(calculo, anoPedido)
   const recorte: Recorte = { regime, ano, cenario_vendas: "base", cenario_compras: "base" }
   const base = { recorte, sentido: "entrada" as const }
-  const est = (await lerEstimados(calculo, regime, ano)).entrada
-  const aj = <G extends Grupo>(gs: G[], mapa: Map<string, Ajuste>, chave: (g: G) => string) => (sem ? semEstimados(gs, mapa, chave) : gs)
-
-  const regimes = await consultarTudo(id, {
+  // Todas as consultas saem juntas; cada uma é aguardada só onde é usada.
+  const regimesP = consultarTudo(id, {
     ...base,
     agrupar_por: ["regime_outra_parte"],
     metricas: [...METRICAS_COMPRA, "parceiros_distintos", "credito_ar", "credito_dr"],
   })
-  const tipos = await consultarTudo(id, { ...base, agrupar_por: ["tipo_linha", "tipo_operacao"], metricas: METRICAS_LISTA })
+  const tiposP = consultarTudo(id, { ...base, agrupar_por: ["tipo_linha", "tipo_operacao"], metricas: METRICAS_LISTA })
+  const fornP = consultarTudo(id, {
+    ...base,
+    agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
+    metricas: METRICAS_LISTA,
+    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
+  })
+  const itensGP = consultarTudo(id, {
+    ...base,
+    agrupar_por: ["descricao_produto", "ncm", "cnpj_outra_parte"],
+    metricas: METRICAS_LISTA,
+    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
+  })
+  const ncmsP = consultarTudo(id, { ...base, agrupar_por: ["ncm"], metricas: [...METRICAS_COMPRA] })
+  // Evita rejeição não tratada se algo antes do await falhar.
+  for (const p of [regimesP, tiposP, fornP, itensGP, ncmsP]) p.catch(() => {})
+  const est = (await lerEstimados(calculo, regime, ano)).entrada
+  const aj = <G extends Grupo>(gs: G[], mapa: Map<string, Ajuste>, chave: (g: G) => string) => (sem ? semEstimados(gs, mapa, chave) : gs)
+
+  const regimes = await regimesP
+  const tipos = await tiposP
   const porTipo = totaisPorTipo(aj(tipos.grupos, est.porTipo, chaves.tipo))
   const porRegime: PorRegime[] = aj(regimes.grupos, est.porRegime, chaves.regime)
     .map((g) => ({
@@ -299,12 +317,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
     }))
     .sort((a, b) => b.valorAr - a.valorAr)
 
-  const forn = await consultarTudo(id, {
-    ...base,
-    agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
-    metricas: METRICAS_LISTA,
-    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
-  })
+  const forn = await fornP
   const parceiros: Parceiro[] = aj(forn.grupos, est.porCnpj, chaves.cnpj).map((g) => ({
     ...valores(g),
     cnpj: texto(g.cnpj_outra_parte),
@@ -312,12 +325,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
     regime: texto(g.regime_outra_parte),
   }))
 
-  const itensG = await consultarTudo(id, {
-    ...base,
-    agrupar_por: ["descricao_produto", "ncm", "cnpj_outra_parte"],
-    metricas: METRICAS_LISTA,
-    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
-  })
+  const itensG = await itensGP
   const itens: Item[] = aj(itensG.grupos, est.porItem, chaves.item).map((g) => ({
     ...valores(g),
     descricao: texto(g.descricao_produto),
@@ -326,7 +334,7 @@ export async function montarCompras(calculo: CalculoDetalhe, regime: Recorte["re
     nome: null,
   }))
 
-  const ncms = await consultarTudo(id, { ...base, agrupar_por: ["ncm"], metricas: [...METRICAS_COMPRA] })
+  const ncms = await ncmsP
 
   const difPreco = (x: Valores) => x.valorDr - x.valorAr
   const difCusto = (x: Valores) => x.custoDr - x.custoAr
@@ -463,7 +471,8 @@ export async function montarVendas(
   const id = calculo.id
   const ano = anoAcao(calculo, anoPedido)
   // Estimados medidos no Com Reajuste e aplicados a todos os cenários de venda.
-  const est = (await lerEstimados(calculo, regime, ano)).saida
+  const estP = lerEstimados(calculo, regime, ano)
+  estP.catch(() => {})
   const aj = <G extends Grupo>(gs: G[], mapa: Map<string, Ajuste>, chave: (g: G) => string) => (sem ? semEstimados(gs, mapa, chave) : gs)
   const cenarios = cenariosDeVenda(calculo)
   const temBase = cenarios.some((c) => c.id === "base")
@@ -471,22 +480,30 @@ export async function montarVendas(
   const neutro = cenarioId === CUSTO_NEUTRO.id && temBase
   const k = temBase
     ? fatorCustoNeutro(
-        await somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "saida"),
-        await somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "entrada"),
+        ...(await Promise.all([
+          somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "saida"),
+          somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "entrada"),
+        ])),
       )
     : 1
+  const est = (await estP).saida
   const cenario = neutro ? CUSTO_NEUTRO : (cenarios.find((c) => c.id === cenarioId) ?? cenarios.find((c) => c.id === "base") ?? cenarios[0])
   const recorteDe = (c: string): Recorte => ({ regime, ano, cenario_vendas: c, cenario_compras: "base" })
 
   // Volume por regime do cliente, nos três cenários (uma consulta por cenário).
+  const consultasCenario = await Promise.all(
+    cenarios.map((c) =>
+      consultarTudo(id, {
+        recorte: recorteDe(c.id),
+        sentido: "saida",
+        agrupar_por: ["regime_outra_parte"],
+        metricas: [...METRICAS_VENDA_REGIME],
+      }),
+    ),
+  )
   const porCenario = []
-  for (const c of cenarios) {
-    const r = await consultarTudo(id, {
-      recorte: recorteDe(c.id),
-      sentido: "saida",
-      agrupar_por: ["regime_outra_parte"],
-      metricas: [...METRICAS_VENDA_REGIME],
-    })
+  for (const [ic, c] of cenarios.entries()) {
+    const r = consultasCenario[ic]
     const porRegime: VendaPorRegime[] = aj(r.grupos, est.porRegime, chaves.regime)
       .map((g) => ({
         regime: texto(g.regime_outra_parte),
@@ -519,6 +536,29 @@ export async function montarVendas(
   const recorte = recorteDe(neutro ? "base" : cenario.id)
   const kLista = neutro ? k : 1
   const base = { recorte, sentido: "saida" as const }
+  // Todas as consultas saem juntas; cada uma é aguardada só onde é usada.
+  const tiposP = consultarTudo(id, { ...base, agrupar_por: ["tipo_linha", "tipo_operacao"], metricas: METRICAS_LISTA })
+  const cliP = consultarTudo(id, {
+    ...base,
+    agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
+    metricas: METRICAS_LISTA,
+    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
+  })
+  const itensGP = consultarTudo(id, {
+    ...base,
+    agrupar_por: ["descricao_produto", "ncm", "cnpj_outra_parte"],
+    metricas: METRICAS_LISTA,
+    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
+  })
+  const ncmsP = consultarTudo(id, { ...base, agrupar_por: ["ncm"], metricas: [...METRICAS_COMPRA] })
+  const desvP = consultarTudo(id, {
+    ...base,
+    agrupar_por: ["ncm", "cfop", "regime_outra_parte"],
+    metricas: ["itens", "valor_dr", "carga_efetiva_dr"],
+    ordenar_por: { metrica: "valor_dr", direcao: "desc" },
+  })
+  // Evita rejeição não tratada se algo antes do await falhar.
+  for (const p of [tiposP, cliP, itensGP, ncmsP, desvP]) p.catch(() => {})
 
   // Custo do cliente: o valor das vendas e cada tributo da nota, para aplicar os créditos de cada perfil.
   const metricasCliente = ["valor_ar", "valor_dr", ...TRIBUTOS.flatMap((t) => [`valor_${t.id}_ar`, `valor_${t.id}_dr`])] as Metrica[]
@@ -527,31 +567,16 @@ export async function montarVendas(
     const g = grupos[0] ?? {}
     return Object.fromEntries(metricasCliente.map((m) => [m, n(g[m])])) as Record<string, number>
   }).then((c) => (sem ? somaSemEstimados(c, est.total) : c)), kLista)
-  const tipos = await consultarTudo(id, { ...base, agrupar_por: ["tipo_linha", "tipo_operacao"], metricas: METRICAS_LISTA })
+  const tipos = await tiposP
   const porTipo = totaisPorTipo(escalarDr(aj(tipos.grupos, est.porTipo, chaves.tipo), kLista))
-  const cli = await consultarTudo(id, {
-    ...base,
-    agrupar_por: ["cnpj_outra_parte", "regime_outra_parte"],
-    metricas: METRICAS_LISTA,
-    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
-  })
+  const cli = await cliP
   const clientes: Parceiro[] = escalarDr(aj(cli.grupos, est.porCnpj, chaves.cnpj), kLista).map((g) => ({ ...valores(g), cnpj: texto(g.cnpj_outra_parte), nome: null, regime: texto(g.regime_outra_parte) }))
-  const itensG = await consultarTudo(id, {
-    ...base,
-    agrupar_por: ["descricao_produto", "ncm", "cnpj_outra_parte"],
-    metricas: METRICAS_LISTA,
-    ordenar_por: { metrica: "valor_ar", direcao: "desc" },
-  })
+  const itensG = await itensGP
   const itens: Item[] = escalarDr(aj(itensG.grupos, est.porItem, chaves.item), kLista).map((g) => ({ ...valores(g), descricao: texto(g.descricao_produto), ncm: texto(g.ncm), cnpj: texto(g.cnpj_outra_parte), nome: null }))
-  const ncms = await consultarTudo(id, { ...base, agrupar_por: ["ncm"], metricas: [...METRICAS_COMPRA] })
+  const ncms = await ncmsP
 
   // Desvios: o mesmo NCM com carga diferente conforme o destino (CFOP) e o regime do cliente.
-  const desv = await consultarTudo(id, {
-    ...base,
-    agrupar_por: ["ncm", "cfop", "regime_outra_parte"],
-    metricas: ["itens", "valor_dr", "carga_efetiva_dr"],
-    ordenar_por: { metrica: "valor_dr", direcao: "desc" },
-  })
+  const desv = await desvP
   const porNcm = new Map<string, Grupo[]>()
   for (const g of desv.grupos) {
     const k = texto(g.ncm)
@@ -671,23 +696,18 @@ export async function montarTrilha(calculo: CalculoDetalhe, regime: Recorte["reg
   const todos = [...calculo.anos].sort((a, b) => a - b)
   const anos = todos.filter((a) => a >= ANO_ACAO).length ? todos.filter((a) => a >= ANO_ACAO) : todos
   const cenarios = cenariosDeVenda(calculo)
-  // Compras: uma consulta por ano (o cenário de venda não muda as compras).
-  const compras: Somas[] = []
-  for (const ano of anos) compras.push(await somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "entrada"))
-  // Estimados de cada ano (uma leitura das linhas por ano, com cache).
-  const estimados: Estimados[] = []
-  for (const ano of anos) estimados.push(await lerEstimados(calculo, regime, ano))
-  if (sem) compras.forEach((c, i) => (compras[i] = somaSemEstimados(c, estimados[i].entrada.total)))
-  // Vendas: uma consulta por ano e cenário (até 7 × 3), em sequência e com cache.
-  const resultado: Trilha["cenarios"] = []
-  for (const c of cenarios) {
-    const vendas: Somas[] = []
-    for (const [i, ano] of anos.entries()) {
-      const v = await somas(id, { regime, ano, cenario_vendas: c.id, cenario_compras: "base" }, "saida")
-      vendas.push(sem ? somaSemEstimados(v, estimados[i].saida.total) : v)
-    }
-    resultado.push({ ...c, vendas })
-  }
+  // Tudo em paralelo: o limite de chamadas simultâneas fica no cliente da API (lib/pricetax.ts).
+  // Compras: uma consulta por ano (o cenário de venda não muda as compras); estimados: uma leitura por ano.
+  const [comprasBrutas, estimados, vendasPorCenario] = await Promise.all([
+    Promise.all(anos.map((ano) => somas(id, { regime, ano, cenario_vendas: "base", cenario_compras: "base" }, "entrada"))),
+    Promise.all(anos.map((ano) => lerEstimados(calculo, regime, ano))),
+    Promise.all(cenarios.map((c) => Promise.all(anos.map((ano) => somas(id, { regime, ano, cenario_vendas: c.id, cenario_compras: "base" }, "saida"))))),
+  ])
+  const compras: Somas[] = sem ? comprasBrutas.map((c, i) => somaSemEstimados(c, estimados[i].entrada.total)) : comprasBrutas
+  const resultado: Trilha["cenarios"] = cenarios.map((c, k) => ({
+    ...c,
+    vendas: vendasPorCenario[k].map((v, i) => (sem ? somaSemEstimados(v, estimados[i].saida.total) : v)),
+  }))
   const base = resultado.find((c) => c.id === "base")
   if (base) {
     resultado.push({ ...CUSTO_NEUTRO, vendas: base.vendas.map((v, i) => escalarDr(v, fatorCustoNeutro(v, compras[i] ?? {}))) })
@@ -724,9 +744,9 @@ export async function montarEstorno(calculo: CalculoDetalhe, regime: Recorte["re
   const anos = [...calculo.anos].sort((a, b) => a - b).filter((a) => a >= ANO_ACAO)
   let ar: Estorno["ar"] | null = null
   const pontos: Estorno["anos"] = []
-  for (const ano of anos) {
+  const somasAno = await Promise.all(anos.map((ano) => {
     const recorte: Recorte = { regime, ano, cenario_vendas: cenario.id, cenario_compras: "base" }
-    const soma = await emCache(`cap-estorno:${id}:${JSON.stringify(recorte)}`, 1800, async () => {
+    return emCache(`cap-estorno:${id}:${JSON.stringify(recorte)}`, 1800, async () => {
       const stream = await pricetax().calculos.exportar(id, { recorte, sentido: "saida" })
       const s = { notaAr: 0, notaDr: 0, debitoAr: 0, debitoDr: 0, vendasAr: 0 }
       for await (const r of registrosCsv(stream)) {
@@ -738,6 +758,9 @@ export async function montarEstorno(calculo: CalculoDetalhe, regime: Recorte["re
       }
       return s
     })
+  }))
+  for (const [i, ano] of anos.entries()) {
+    const soma = somasAno[i]
     ar ??= { destacado: soma.notaAr, devido: soma.debitoAr, estorno: Math.max(0, soma.notaAr - soma.debitoAr), vendas: soma.vendasAr }
     pontos.push({ ano, destacado: soma.notaDr, devido: soma.debitoDr, estorno: Math.max(0, soma.notaDr - soma.debitoDr) })
   }

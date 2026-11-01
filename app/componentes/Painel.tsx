@@ -32,7 +32,7 @@ import {
   type Selecao,
   type Sentido,
 } from "@/lib/catalogo"
-import { api, fmtBRL, fmtCnpj, fmtInt, fmtPct, pontos, useBusca, variacao } from "./util"
+import { api, fmtBRL, fmtCnpj, fmtInt, fmtPct, pontos, preCarregar, useBusca, variacao } from "./util"
 import { GraficoSerie, type PontoSerie } from "./GraficoSerie"
 import { Ranking } from "./Ranking"
 import { TabelaLinhas } from "./TabelaLinhas"
@@ -232,6 +232,28 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
     setAba(nova)
   }
 
+  // Pré-carga: depois da aba aberta, as outras vão sendo lidas em segundo plano (uma por vez), para a
+  // troca de aba ser imediata. Os corpos são os mesmos que cada aba envia, para cair no mesmo cache.
+  useEffect(() => {
+    if (!regime || ano === undefined || !cenarioVendas) return
+    const selecao: Selecao = {
+      recorte: { regime, ano, cenario_vendas: cenarioVendas, cenario_compras: cenarioCompras ?? cenarioVendas },
+      sentido,
+      filtro,
+    }
+    const c = `/api/calculos/${calculo.id}`
+    preCarregar([
+      { caminho: `${c}/capitulos/compras`, corpo: { regime, ano, semEstimados } },
+      { caminho: `${c}/capitulos/vendas`, corpo: { regime, cenario: "base", quantidade: 10, ano, semEstimados } },
+      { caminho: `${c}/capitulos/trilha`, corpo: { regime, semEstimados } },
+      { caminho: `${c}/capitulos/estorno`, corpo: { regime } },
+      { caminho: `${c}/classificacao`, corpo: selecao },
+      { caminho: `${c}/capitulos/precificacao`, corpo: { regime } },
+      ...calculo.regimes.filter((r) => r !== regime).map((r) => ({ caminho: `${c}/capitulos/trilha`, corpo: { regime: r, semEstimados } })),
+    ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calculo.id, regime, ano, semEstimados, cenarioVendas, cenarioCompras, sentido, filtro])
+
   if (!regime || ano === undefined || !cenarioVendas) {
     return <div className="aviso">Este cálculo ainda não tem regimes, anos ou cenários disponíveis para leitura.</div>
   }
@@ -244,6 +266,7 @@ function Visao({ calculo }: { calculo: CalculoDetalhe }) {
   const chave = JSON.stringify(selecao)
   const capitulo = aba === "compras" || aba === "vendas" || aba === "dre" || aba === "fluxo" || aba === "regime" || aba === "novo" || aba === "auditoria"
   const chaveSerie = JSON.stringify({ ...selecao, recorte: { ...selecao.recorte, ano: null } })
+
 
   return (
     <>

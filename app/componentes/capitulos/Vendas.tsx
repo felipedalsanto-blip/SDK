@@ -3,7 +3,7 @@ import { TrendingUp } from "lucide-react"
 import { useState } from "react"
 import type { Vendas as Dados } from "@/lib/capitulos"
 import { Erro } from "../comum"
-import { api, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
+import { api, useApi, fmtBRL, fmtInt, fmtPct, useBusca } from "../util"
 import { CustoCliente } from "./CustoCliente"
 import { Explorador } from "./Explorador"
 import { AvisoEstimados } from "./Estimados"
@@ -29,13 +29,10 @@ export function Vendas({ calculoId, regime, ano, semEstimados }: { calculoId: st
   const [quantidade, setQuantidade] = useState(10)
   const [sentido, setSentido] = useState<Sentido>("aumento")
   const [pareto, setPareto] = useState<"cliente" | "ncm" | "grupo">("cliente")
-  const { dados, erro, carregando } = useBusca(
-    (s) => api<Dados>(`/api/calculos/${calculoId}/capitulos/vendas`, { regime, cenario, quantidade, ano, semEstimados }, s),
-    [calculoId, regime, cenario, quantidade, ano, semEstimados],
-  )
+  const { dados, erro, carregando, progresso } = useApi<Dados>(`/api/calculos/${calculoId}/capitulos/vendas`, { regime, cenario, quantidade, ano, semEstimados })
 
   if (erro) return <Erro erro={erro} />
-  if (!dados) return <Carregando mensagem={`Lendo as vendas de ${ano} em todos os cenários…`} />
+  if (!dados) return <Carregando mensagem={`Lendo as vendas de ${ano} em todos os cenários…`} progresso={progresso} />
   const atual = dados.cenarios.find((c) => c.id === dados.cenario.id) ?? dados.cenarios[0]
   const sobe = sentido === "aumento"
   const p = dados.pareto

@@ -4,7 +4,7 @@ import { ArrowDownRight, ArrowUpRight, ChevronsDownUp, ChevronsUpDown, Minus, ty
 import type { Item, Pareto as DadosPareto, Parceiro, PorTipo } from "@/lib/capitulos"
 import type { Linha } from "@/lib/demonstrativos"
 import { TRIBUTOS } from "@/lib/tributos"
-import { fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, fmtPct, useLargura, variacao } from "../util"
+import { fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, fmtPct, useLargura, variacao, type ProgressoApi } from "../util"
 import { useAbrirFicha } from "./ficha-contexto"
 
 /** Cores fixas: AR (hoje) em cinza; os cenários de venda em preto, amarelo, cinza médio e azul (Custo Neutro). */
@@ -84,9 +84,10 @@ export function Capitulo({
 }
 
 /** Esqueleto enquanto os dados chegam: a forma da tela, com a mensagem do que está sendo lido. */
-export function Carregando({ mensagem, indicadores = 4 }: { mensagem: string; indicadores?: number }) {
+export function Carregando({ mensagem, indicadores = 4, progresso }: { mensagem: string; indicadores?: number; progresso?: ProgressoApi }) {
   return (
     <div className="esqueleto" role="status" aria-live="polite">
+      {progresso && <BarraProgresso p={progresso} />}
       <div className="esqueleto-cabeca" />
       <div className="esqueleto-kpis">
         {Array.from({ length: indicadores }, (_, i) => (
@@ -103,6 +104,27 @@ export function Carregando({ mensagem, indicadores = 4 }: { mensagem: string; in
         ))}
       </div>
       <p className="esqueleto-mensagem">{mensagem}</p>
+    </div>
+  )
+}
+
+/** Progresso real: chamadas à API concluídas e tempo decorrido. */
+export function BarraProgresso({ p }: { p: ProgressoApi }) {
+  const [agora, setAgora] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 500)
+    return () => clearInterval(t)
+  }, [])
+  const s = Math.max(0, Math.round((agora - p.inicio) / 1000))
+  const pct = p.total ? Math.min(100, (p.feito / p.total) * 100) : null
+  return (
+    <div className="progresso">
+      <div className="progresso-trilho" role="progressbar" aria-valuemin={0} aria-valuemax={p.total ?? undefined} aria-valuenow={p.feito} aria-label="Consultas à PriceTax">
+        <span className={pct === null ? "progresso-indeterminado" : undefined} style={pct === null ? undefined : { width: `${Math.max(4, pct)}%` }} />
+      </div>
+      <span className="progresso-texto">
+        {p.total ? `${Math.min(p.feito, p.total)} de ~${p.total} consultas à PriceTax` : `${p.feito} consultas à PriceTax`} · {s} s
+      </span>
     </div>
   )
 }

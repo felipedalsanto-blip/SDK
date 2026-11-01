@@ -36,7 +36,7 @@ import {
 import { TIPOS_ERRO } from "@/lib/classificacao"
 import { Erro } from "./comum"
 import { escalaBonita } from "./GraficoSerie"
-import { api, fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, useBusca, useLargura } from "./util"
+import { api, fmtBRL, fmtBRLCurto, fmtCnpj, fmtInt, useApi, useBusca, useLargura } from "./util"
 
 type Abrir = (alvo: Alvo, titulo: string) => void
 
@@ -53,10 +53,7 @@ export function VisaoClassificacao({
   chaveProjecao: string
   onAno: (ano: number) => void
 }) {
-  const analise = useBusca(
-    (s) => api<AnaliseClassificacao>(`/api/calculos/${calculo.id}/classificacao`, selecao, s),
-    [calculo.id, chave],
-  )
+  const analise = useApi<AnaliseClassificacao>(`/api/calculos/${calculo.id}/classificacao`, selecao)
   const projecao = useBusca(
     (s) => api<{ projecao: PontoProjecao[] }>(`/api/calculos/${calculo.id}/classificacao/projecao`, selecao, s),
     [calculo.id, chaveProjecao],
