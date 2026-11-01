@@ -890,3 +890,23 @@ td.aud-longo { white-space: normal; min-width: 280px; }
 @keyframes iva-fade { from { opacity: 0; } }
 @keyframes iva-entra { from { transform: translateX(24px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .iva-barra, .iva-pilha-seg { transition: none; } .iva-gaveta, .iva-gaveta-fundo { animation: none; } }
+
+/* Melhor regime tributário */
+.rg-destaque { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(240px, 1.4fr); gap: 16px; align-items: center; padding: 16px; border-radius: 14px; border: 1px solid var(--border); border-left: 6px solid var(--pt-amarelo, #f5c400); }
+@media (max-width: 720px) { .rg-destaque { grid-template-columns: 1fr; } }
+.rg-destaque > div:first-child { display: grid; gap: 4px; }
+.rg-rotulo { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); font-weight: 600; }
+.rg-nome { font-size: clamp(26px, 4vw, 34px); letter-spacing: -0.02em; line-height: 1.1; }
+.rg-comparacao { font-size: 15px; line-height: 1.5; }
+.rg-aviso { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; }
+.rg-controles { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+.rg-tabela th[scope="row"] { text-align: left; font-weight: 500; }
+.rg-tabela td.num, .rg-tabela th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rg-melhor { font-weight: 700; background: color-mix(in srgb, var(--pt-amarelo, #f5c400) 18%, transparent); }
+.rg-total th, .rg-total td { border-top: 2px solid var(--border); font-weight: 700; }
+.rg-selo { background: var(--pt-amarelo, #f5c400); color: #111; border-color: transparent; font-weight: 700; }
+.rg-anos { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.rg-anos li { display: grid; gap: 4px; justify-items: center; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border); min-width: 92px; }
+.rg-ano-atual { box-shadow: 0 0 0 2px var(--pt-amarelo, #f5c400); }
+.rg-ano { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rg-chip { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 2px solid var(--border); white-space: nowrap; }
