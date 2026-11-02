@@ -115,13 +115,16 @@ export function MelhorRegime({ calculo, ano, semEstimados }: { calculo: CalculoD
   const res = regimes.map((r) => resultado(trilhas[r], r, cen, premissas))
   const iAno = Math.max(0, anos.indexOf(ano)) + 1
   const anoVisto = anos[iAno - 1]
-  const ordem = [...res].sort((a, b) => b.lucroLiquido[iAno] - a.lucroLiquido[iAno])
-  const melhor = ordem[0]
   const doAtual = res.find((r) => r.regime === atual)!
+  // Trava de faturamento: regime cujo limite anual a empresa passa não pode ser recomendado.
+  const faturamentoAnual = (doAtual.faturamento[0] ?? 0) * (meses ? 12 / meses : 1)
+  const elegivel = (r: string) => !(LIMITE[r] && faturamentoAnual > LIMITE[r].valor)
+  const candidatos = res.filter((r) => elegivel(r.regime))
+  const ordem = [...(candidatos.length ? candidatos : res)].sort((a, b) => b.lucroLiquido[iAno] - a.lucroLiquido[iAno])
+  const melhor = ordem[0]
   const ganhoTroca = (melhor.lucroLiquido[iAno] - doAtual.lucroLiquido[iAno]) * fator
   const nome = (r: string) => REGIMES[r] ?? r
-  const vencedorPorAno = anos.map((_, k) => [...res].sort((a, b) => b.lucroLiquido[k + 1] - a.lucroLiquido[k + 1])[0].regime)
-  const faturamentoAnual = (doAtual.faturamento[0] ?? 0) * (meses ? 12 / meses : 1)
+  const vencedorPorAno = anos.map((_, k) => [...ordem].sort((a, b) => b.lucroLiquido[k + 1] - a.lucroLiquido[k + 1])[0].regime)
 
   const linhas: { rot: string; valor: (r: Resultado) => number | null; pct?: boolean; melhorMaior?: boolean; dica?: string }[] = [
     { rot: "Faturamento (valor das notas)", valor: (r) => r.faturamento[iAno] * fator },
@@ -146,8 +149,15 @@ export function MelhorRegime({ calculo, ano, semEstimados }: { calculo: CalculoD
           <div className="rg-comparacao">
             {melhor.regime === atual ? (
               <span>
-                O regime atual (<b>{nome(atual)}</b>) já é o melhor em {anoVisto}. Diferença para o 2º colocado ({nome(ordem[1].regime)}):{" "}
-                <b className="oport">{fmtBRL((melhor.lucroLiquido[iAno] - ordem[1].lucroLiquido[iAno]) * fator)}</b>.
+                O regime atual (<b>{nome(atual)}</b>) já é o melhor em {anoVisto}
+                {ordem[1] ? (
+                  <>
+                    . Diferença para o 2º colocado ({nome(ordem[1].regime)}):{" "}
+                    <b className="oport">{fmtBRL((melhor.lucroLiquido[iAno] - ordem[1].lucroLiquido[iAno]) * fator)}</b>.
+                  </>
+                ) : (
+                  ": os outros regimes simulados não são permitidos pelo faturamento."
+                )}
               </span>
             ) : (
               <span>
@@ -166,7 +176,7 @@ export function MelhorRegime({ calculo, ano, semEstimados }: { calculo: CalculoD
               <a href={l.url} target="_blank" rel="noreferrer">
                 {l.fonte}
               </a>
-              ): a empresa não pode optar por ele, mesmo que o número pareça melhor.
+              ): a empresa não pode optar por ele. Ele fica fora da recomendação, mesmo que o lucro pareça maior.
             </p>
           ))}
       </Bloco>
@@ -205,6 +215,7 @@ export function MelhorRegime({ calculo, ano, semEstimados }: { calculo: CalculoD
                     {nome(r.regime)}
                     {r.regime === atual && <span className="etiqueta"> atual</span>}
                     {r.regime === melhor.regime && <span className="etiqueta rg-selo"> melhor</span>}
+                    {!elegivel(r.regime) && <span className="etiqueta rg-inelegivel" title={`Faturamento anual acima do limite de ${fmtBRL(LIMITE[r.regime].valor)}`}> não permitido</span>}
                   </th>
                 ))}
               </tr>
@@ -212,13 +223,13 @@ export function MelhorRegime({ calculo, ano, semEstimados }: { calculo: CalculoD
             <tbody>
               {linhas.map((l) => {
                 const vs = res.map((r) => l.valor(r))
-                const validos = vs.filter((x): x is number => x !== null)
+                const validos = res.filter((r) => elegivel(r.regime) || !candidatos.length).map((r) => l.valor(r)).filter((x): x is number => x !== null)
                 const alvo = l.melhorMaior === undefined ? null : l.melhorMaior ? Math.max(...validos) : Math.min(...validos)
                 return (
                   <tr key={l.rot} className={l.rot === "Lucro líquido" ? "rg-total" : undefined}>
                     <th scope="row">{l.rot}</th>
                     {vs.map((x, i) => (
-                      <td key={i} className={`num${alvo !== null && x === alvo ? " rg-melhor" : ""}`}>
+                      <td key={i} className={`num${alvo !== null && x === alvo && (elegivel(res[i].regime) || !candidatos.length) ? " rg-melhor" : ""}${elegivel(res[i].regime) ? "" : " rg-fora"}`}>
                         {x === null ? <span className="iva-sem">{l.dica ?? "—"}</span> : l.pct ? fmtPct(x) : fmtBRL(x)}
                       </td>
                     ))}
