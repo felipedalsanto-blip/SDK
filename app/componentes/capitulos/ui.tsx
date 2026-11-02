@@ -129,7 +129,38 @@ export function BarraProgresso({ p }: { p: ProgressoApi }) {
   )
 }
 
-export function Bloco({ titulo, leitura, children }: { titulo: string; leitura?: React.ReactNode; children: React.ReactNode }) {
+export function Bloco({
+  titulo,
+  leitura,
+  children,
+  recolhivel,
+  resumo,
+}: {
+  titulo: string
+  leitura?: React.ReactNode
+  children: React.ReactNode
+  /** Bloco que abre e fecha: "fechado" começa recolhido. Responde a "Expandir tudo / Recolher tudo". */
+  recolhivel?: "aberto" | "fechado"
+  /** Uma linha do que está dentro, mostrada com o bloco fechado. */
+  resumo?: React.ReactNode
+}) {
+  const { comando } = useContext(ExpandirCtx)
+  const [aberto, setAberto] = useState(recolhivel !== "fechado")
+  useEffect(() => {
+    if (recolhivel && comando.seq > 0) setAberto(comando.nivel > 0)
+  }, [comando, recolhivel])
+  if (recolhivel) {
+    return (
+      <details className="cap-bloco cap-bloco-recolhivel" open={aberto} onToggle={(ev) => setAberto((ev.target as HTMLDetailsElement).open)}>
+        <summary>
+          <h3>{titulo}</h3>
+          {!aberto && resumo && <span className="cap-bloco-resumo">{resumo}</span>}
+        </summary>
+        {leitura && <p className="cap-leitura">{leitura}</p>}
+        {children}
+      </details>
+    )
+  }
   return (
     <div className="cap-bloco">
       <h3>{titulo}</h3>

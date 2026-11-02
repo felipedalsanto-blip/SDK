@@ -58,7 +58,13 @@ export type Entrada = {
   metodo: Metodo
   custo: number
   margemModo: "margem" | "markup" | "preco"
-  margem: number // % (ou R$ do preço líquido no modo "preco")
+  margem: number // % (ou R$ do preço líquido no modo "preco"); no markup, % sobre o custo (1,40x = 40)
+  /**
+   * Markup com os tributos de hoje por dentro (como o comércio forma preço): custo × markup é o valor da
+   * operação de hoje, com ICMS, ISS e PIS/COFINS dentro; o valor líquido sai dele. Sem marcar, custo ×
+   * markup é o valor líquido e os tributos vão em cima. Padrão: por dentro.
+   */
+  markupDentro?: boolean
   despesas: number // R$: frete, seguro e outras despesas acessórias cobradas na nota
   ano: number
   destino: Destino
@@ -92,11 +98,32 @@ export function nominais(a: Aliqs): Record<Atual, number> {
   return { icms: r(a.icms), iss: r(a.iss), pis_cofins: r(a.pis_cofins), ipi: r(a.ipi) }
 }
 
+/** Markup com os tributos por dentro? (padrão: sim) */
+export const markupPorDentro = (e: Entrada) => e.margemModo === "markup" && e.markupDentro !== false
+
 export function precoLiquido(e: Entrada): number {
   const m = e.margem / 100
   if (e.margemModo === "preco") return e.margem
+  if (markupPorDentro(e)) return liquidoPorDentro(e) - e.despesas
   if (e.margemModo === "markup") return e.custo * (1 + m)
   return m < 1 ? e.custo / (1 - m) : 0
+}
+
+/**
+ * Markup por dentro: o valor da operação de hoje é custo × markup (+ outras despesas), com ICMS, ISS e
+ * PIS/COFINS dentro. Acha o valor líquido que, montado na nota de hoje, dá exatamente essa operação.
+ */
+function liquidoPorDentro(e: Entrada): number {
+  const alvo = e.custo * (1 + e.margem / 100) + e.despesas
+  const como = (L: number) => simularComLiquido({ ...e, margemModo: "preco", margem: L - e.despesas }, "ar", L).operacao
+  let lo = 0
+  let hi = Math.max(1, alvo)
+  for (let i = 0; i < 100; i++) {
+    const meio = (lo + hi) / 2
+    if (como(meio) < alvo) lo = meio
+    else hi = meio
+  }
+  return (lo + hi) / 2
 }
 
 export type Nota = {
@@ -124,7 +151,11 @@ const pct = (v: number) => (Number.isFinite(v) ? v / 100 : 0)
 
 export function simular(e: Entrada, periodo: number | "ar"): Nota {
   const pl = precoLiquido(e)
-  const liquido = pl + e.despesas
+  return simularComLiquido(e, periodo, pl + e.despesas)
+}
+
+function simularComLiquido(e: Entrada, periodo: number | "ar", liquido: number): Nota {
+  const pl = liquido - e.despesas
   const reforma = periodo !== "ar"
   const soNovos = e.metodo === "novos" && reforma
   const produto = e.tipo === "produto"

@@ -8,7 +8,9 @@ import {
   baseCliente,
   nominais,
   precoLiquido,
+  markupPorDentro,
   simular,
+  transicao,
   type Atual,
   type Destino,
   type Entrada,
@@ -31,7 +33,7 @@ const DESTINOS: Record<Destino, string> = {
   final: "Consumidor final não contribuinte",
 }
 const METODOS: Record<Metodo, string> = { transicao: "Transição completa", novos: "Só os novos tributos" }
-const MODOS = { margem: "Margem sobre o preço líquido (%)", markup: "Markup sobre o custo (%)", preco: "Preço líquido informado (R$)" }
+const MODOS = { markup: "Markup sobre o custo (×)", margem: "Margem sobre o preço líquido (%)", preco: "Preço líquido informado (R$)" }
 
 /** O cClassTrib agrupado por CST, para o seletor. */
 const CLASSES_POR_CST = Object.entries(CCLASS).reduce<Record<string, [string, string][]>>((acc, [codigo, c]) => {
@@ -52,8 +54,9 @@ function padrao(d: Precificacao): Entrada {
     nbs: "",
     metodo: "transicao",
     custo: 100,
-    margemModo: "margem",
-    margem: 30,
+    margemModo: "markup",
+    margem: 40,
+    markupDentro: true,
     despesas: 0,
     ano: d.anos[0],
     destino: "revenda",
@@ -271,7 +274,16 @@ function Simulador({
               ))}
             </select>
           </label>
-          <Numero rotulo={e.margemModo === "preco" ? "Preço líquido (R$)" : e.margemModo === "markup" ? "Markup (%)" : "Margem (%)"} valor={e.margem} passo={e.margemModo === "preco" ? 1 : 0.5} onChange={(v) => mudar({ margem: v })} />
+          {e.margemModo === "markup" ? (
+            <Numero
+              rotulo="Markup (×)"
+              valor={Math.round((1 + e.margem / 100) * 10000) / 10000}
+              passo={0.05}
+              onChange={(v) => mudar({ margem: Math.round((v - 1) * 1000000) / 10000 })}
+            />
+          ) : (
+            <Numero rotulo={e.margemModo === "preco" ? "Preço líquido (R$)" : "Margem (%)"} valor={e.margem} passo={e.margemModo === "preco" ? 1 : 0.5} onChange={(v) => mudar({ margem: v })} />
+          )}
           <Numero rotulo="Outras despesas na nota (R$)" valor={e.despesas} passo={1} onChange={(v) => mudar({ despesas: v })} />
           <label>
             Ano da nota
@@ -284,14 +296,31 @@ function Simulador({
             </select>
           </label>
         </div>
+        {e.margemModo === "markup" && (
+          <div className="np-rotulo">
+            Tributos de hoje no markup
+            <Alternar
+              opcoes={{ dentro: "Por dentro do preço", fora: "Por fora (em cima)" }}
+              valor={e.markupDentro === false ? "fora" : "dentro"}
+              onChange={(v) => mudar({ markupDentro: v === "dentro" })}
+            />
+            <span className="cap-sub">
+              {e.markupDentro === false
+                ? `Custo × markup (${fmtBRL(e.custo * (1 + e.margem / 100))}) é o valor líquido; ICMS, ISS e PIS/COFINS de hoje vão em cima.`
+                : `Custo × markup (${fmtBRL(e.custo * (1 + e.margem / 100))}) é o preço de venda de hoje, com ICMS, ISS e PIS/COFINS dentro, como o comércio forma preço. O valor líquido sai dele.`}
+            </span>
+          </div>
+        )}
         <p className="cap-nota">
           <b>Valor líquido {fmtBRL(liquido)}</b> (custo + margem + outras despesas: é a base do IBS e da CBS e o que a empresa recebe livre de tributos) ·
-          preço líquido {fmtBRL(pl)} · margem de {pl > 0 ? fmtPct((pl - e.custo) / pl) : "n/d"} sobre o preço líquido · markup de{" "}
-          {e.custo > 0 ? fmtPct((pl - e.custo) / e.custo) : "n/d"} sobre o custo.
+          preço líquido {fmtBRL(pl)} · margem de {pl > 0 ? fmtPct((pl - e.custo) / pl) : "n/d"} sobre o preço líquido · markup líquido de{" "}
+          {e.custo > 0 ? `${(pl / e.custo).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}×` : "n/d"} sobre o custo.
         </p>
       </Bloco>
 
       <Bloco
+        recolhivel="fechado"
+        resumo={`${{ revenda: "Revenda/industrialização", consumo: "Uso e consumo", final: "Consumidor final" }[e.destino]}${e.interestadual ? " · interestadual" : ""} · ICMS ${e.hoje.icms}% · PIS/COFINS ${e.hoje.pis_cofins}%${e.hoje.iss ? ` · ISS ${e.hoje.iss}%` : ""}${e.hoje.ipi ? ` · IPI ${e.hoje.ipi}%` : ""}${e.st.ativo ? " · com ST" : ""}${e.difal.ativo ? " · com DIFAL" : ""}`}
         titulo="3. Operação e tributos de hoje"
         leitura={
           e.metodo === "transicao"
@@ -399,9 +428,20 @@ function Simulador({
         </div>
       </Bloco>
 
-      <Bloco titulo="4. cClassTrib e benefício" leitura="A classificação define o CST do IBS e da CBS e a redução de alíquota. A alíquota cheia de cada ano vem das suas vendas no cálculo; dá para ajustar.">
+      <Bloco recolhivel="fechado" resumo={`${e.cclass} · ${CCLASS[e.cclass]?.nome ?? "classificação"}`} titulo="4. cClassTrib e benefício" leitura="A classificação define o CST do IBS e da CBS e a redução de alíquota. A alíquota cheia de cada ano vem das suas vendas no cálculo; dá para ajustar.">
         <Classificacao e={e} mudar={mudar} d={d} />
       </Bloco>
+
+      {e.metodo === "novos" && e.ano < 2033 && (e.hoje.icms > 0 || e.hoje.iss > 0) && (
+        <p className="aviso np-alerta">
+          Em {e.ano} o {e.hoje.icms > 0 ? "ICMS" : "ISS"} ainda existe ({Math.round(transicao(e.hoje.icms > 0 ? "icms" : "iss", e.ano) * 100)}% da
+          alíquota de hoje), mas a metodologia “Só os novos tributos” o deixa de fora. Para a nota real de {e.ano}, use a{" "}
+          <button className="botao-link" onClick={() => mudar({ metodo: "transicao" })}>
+            transição completa
+          </button>
+          .
+        </p>
+      )}
 
       <div className="cap-kpis">
         <Indicador icone={Banknote} rotulo="Valor líquido" valor={fmtBRL(liquido)} contexto="o que a empresa recebe livre de tributos" />
@@ -422,15 +462,15 @@ function Simulador({
         </div>
       </Bloco>
 
-      <Bloco titulo={`Como a nota fiscal tem que sair em ${e.ano}`} leitura="Os campos do item na NF-e, com as tags do leiaute da reforma.">
+      <Bloco recolhivel="fechado" resumo="Tags do item na NF-e (CST, cClassTrib, bases e valores)" titulo={`Como a nota fiscal tem que sair em ${e.ano}`} leitura="Os campos do item na NF-e, com as tags do leiaute da reforma.">
         <CamposNota n={nota} e={e} />
       </Bloco>
 
-      <Bloco titulo={`Custo para o seu cliente · hoje × ${e.ano}`} leitura="O que cada tipo de comprador paga de fato, depois dos créditos que aproveita. Clique num perfil para ver a conta.">
+      <Bloco recolhivel="fechado" resumo="Quanto cada tipo de comprador paga depois dos créditos" titulo={`Custo para o seu cliente · hoje × ${e.ano}`} leitura="O que cada tipo de comprador paga de fato, depois dos créditos que aproveita. Clique num perfil para ver a conta.">
         <CustoPorPerfil base={baseCliente(hoje, nota)} ano={e.ano} />
       </Bloco>
 
-      <Bloco titulo="Total pago pelo cliente, ano a ano" leitura="O valor líquido fica igual; muda só o que vai para os tributos. A linha tracejada é o total de hoje.">
+      <Bloco recolhivel="fechado" resumo={`De ${fmtBRL(hoje.total)} hoje a ${fmtBRL(porAno[porAno.length - 1]?.total ?? 0)} em ${d.anos[d.anos.length - 1]}`} titulo="Total pago pelo cliente, ano a ano" leitura="O valor líquido fica igual; muda só o que vai para os tributos. A linha tracejada é o total de hoje.">
         <LinhasAno anos={d.anos} ar={hoje.total} series={[{ nome: "Total pago pelo cliente", cor: "var(--pt-amarelo)", valores: porAno.map((x) => x.total) }]} />
         <div className="tabela-rolagem" tabIndex={0}>
           <table className="cap-tabela">
@@ -686,6 +726,32 @@ function Formacao({ titulo, n, e, destaque = false }: { titulo: string; n: Nota;
     )
   const sobre = (aliq: number, base: number) => `${fmtPct(aliq)} × ${fmtBRL(base)}`
   const v = n.valores
+  // Markup por dentro, hoje: o preço sai do custo × markup e os tributos saem de dentro dele.
+  if (n.periodo === "ar" && markupPorDentro(e)) {
+    const preco = e.custo * (1 + e.margem / 100)
+    const mult = (1 + e.margem / 100).toLocaleString("pt-BR", { maximumFractionDigits: 4 })
+    return (
+      <div className={`memoria-coluna${destaque ? " destaque" : ""}`}>
+        <h4>{titulo}</h4>
+        {linha(`Preço de venda (custo ${fmtBRL(e.custo)} × ${mult})`, preco, undefined, "total")}
+        {linha("(+) Outras despesas (frete, seguro…)", n.despesas)}
+        {linha("(−) ICMS por dentro", -v.icms, sobre(n.aliq.icms, n.bases.icms))}
+        {linha("(−) ISS por dentro", -v.iss, sobre(n.aliq.iss, n.bases.iss))}
+        {linha("(−) PIS/COFINS por dentro", -v.pis_cofins, sobre(n.aliq.pisCofins, n.bases.pisCofins))}
+        {n.difalPagoPor === "remetente" && linha("(−) DIFAL pago por você", -v.icms_difal, sobre(n.aliq.difalDestino - n.aliq.icms, n.bases.difal))}
+        {linha("= Valor líquido (o que fica para a empresa)", n.liquido, undefined, "total")}
+        {linha("    custo líquido", e.custo, undefined, "ajuste")}
+        {linha("    margem que sobra depois dos tributos", n.precoLiquido - e.custo, undefined, "ajuste")}
+        {linha("(+) IPI (por fora)", v.ipi, sobre(n.aliq.ipi, n.bases.ipi))}
+        {linha("(+) ICMS-ST (por fora)", v.icms_st, `${fmtPct(n.aliq.stDestino)} × ${fmtBRL(n.bases.st)} (MVA ${fmtPct(n.aliq.mva)}) − ICMS próprio`)}
+        {linha("= Total pago pelo cliente", n.total, undefined, "resultado")}
+        <div className="memoria-linha ajuste">
+          <span>Tributos dentro do preço</span>
+          <span className="num">{preco ? fmtPct((v.icms + v.iss + v.pis_cofins) / (preco + n.despesas)) : "n/d"}</span>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className={`memoria-coluna${destaque ? " destaque" : ""}`}>
       <h4>{titulo}</h4>

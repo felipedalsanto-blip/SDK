@@ -1005,3 +1005,15 @@ td.aud-longo { white-space: normal; min-width: 280px; }
 .kpi .antes, .cap-kpi-contexto { overflow-wrap: anywhere; }
 .pilula select { width: auto; min-width: 0; field-sizing: content; }
 .ctx-pilulas, .pilula { position: relative; }
+
+/* Blocos que abrem e fecham (Novo produto e outros) */
+.cap-bloco-recolhivel > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.cap-bloco-recolhivel > summary::-webkit-details-marker { display: none; }
+.cap-bloco-recolhivel > summary h3 { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+.cap-bloco-recolhivel > summary h3::before { content: "▸"; font-size: 13px; color: var(--text-secondary); transition: transform .15s ease; display: inline-block; }
+.cap-bloco-recolhivel[open] > summary h3::before { transform: rotate(90deg); }
+.cap-bloco-recolhivel[open] > summary { margin-bottom: 10px; }
+.cap-bloco-recolhivel > summary:focus-visible { outline: 2px solid var(--pt-amarelo); outline-offset: 4px; border-radius: 6px; }
+.cap-bloco-resumo { font-size: 13px; color: var(--text-secondary); }
+.rg-inelegivel { background: var(--surface-2); color: var(--iva-perda-texto, #a12626); border-color: currentColor; font-weight: 700; }
+.rg-fora { color: var(--text-secondary); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-secondary) 50%, transparent); }

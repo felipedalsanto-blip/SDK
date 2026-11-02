@@ -43,13 +43,29 @@ const NOME_REGIME: Record<string, string> = { simplesNacional: "Simples Nacional
 
 export function FormPremissas({ p, mudar }: { p: PremissasIr; mudar: (e: Entrada) => void }) {
   const simples = p.regime === "simplesNacional"
+  const base: Entrada = { despesas: p.despesas, atividade: p.atividade, custo: p.custo ?? { modo: "percentual", valor: 0 } }
+  const custo = base.custo!
   return (
     <div className="cap-premissas-ir">
-      <span className="cap-kpi-rotulo">Premissas para o IRPJ e a CSLL · {NOME_REGIME[p.regime] ?? p.regime}</span>
-      {simples ? (
-        <span className="cap-sub">No Simples Nacional, IRPJ e CSLL estão dentro do DAS e não são calculados à parte.</span>
-      ) : (
-        <div className="cap-premissas-campos">
+      <span className="cap-kpi-rotulo">Premissas da DRE · {NOME_REGIME[p.regime] ?? p.regime}</span>
+      <div className="cap-premissas-campos">
+        <label>
+          Ajuste do custo (estoque)
+          <span className="cap-premissas-linha">
+            <input
+              type="number"
+              step={custo.modo === "percentual" ? 0.5 : 1000}
+              value={custo.valor}
+              onChange={(e) => mudar({ ...base, custo: { ...custo, valor: Number(e.target.value) || 0 } })}
+            />
+            <select value={custo.modo} onChange={(e) => mudar({ ...base, custo: { modo: e.target.value as "percentual" | "valor", valor: custo.valor } })}>
+              <option value="percentual">% do custo das compras</option>
+              <option value="valor">R$ no período</option>
+            </select>
+          </span>
+          <span className="cap-sub">Negativo: parte das compras ficou no estoque (reduz o custo). Positivo: saiu mais do estoque do que entrou.</span>
+        </label>
+        {!simples && (
           <label>
             Despesas operacionais
             <span className="cap-premissas-linha">
@@ -58,30 +74,36 @@ export function FormPremissas({ p, mudar }: { p: PremissasIr; mudar: (e: Entrada
                 min={0}
                 step={p.despesas.modo === "percentual" ? 0.5 : 1000}
                 value={p.despesas.valor}
-                onChange={(e) => mudar({ despesas: { ...p.despesas, valor: Math.max(0, Number(e.target.value) || 0) }, atividade: p.atividade })}
+                onChange={(e) => mudar({ ...base, despesas: { ...p.despesas, valor: Math.max(0, Number(e.target.value) || 0) } })}
               />
-              <select value={p.despesas.modo} onChange={(e) => mudar({ despesas: { modo: e.target.value as "percentual" | "valor", valor: p.despesas.valor }, atividade: p.atividade })}>
+              <select value={p.despesas.modo} onChange={(e) => mudar({ ...base, despesas: { modo: e.target.value as "percentual" | "valor", valor: p.despesas.valor } })}>
                 <option value="percentual">% da receita líquida</option>
                 <option value="valor">R$ no período</option>
               </select>
             </span>
           </label>
-          {p.regime === "lucroPresumido" && (
-            <label>
-              Atividade (presunção)
-              <select value={p.atividade} onChange={(e) => mudar({ despesas: p.despesas, atividade: e.target.value as "comercio" | "servicos" })}>
-                <option value="comercio">Comércio e indústria (8% IRPJ, 12% CSLL)</option>
-                <option value="servicos">Serviços (32% IRPJ, 32% CSLL)</option>
-              </select>
-            </label>
-          )}
-          <span className="cap-sub">
-            {p.regime === "lucroPresumido"
-              ? "IRPJ de 15% e CSLL de 9% sobre a base presumida da receita bruta, mais 10% de adicional de IRPJ acima de R$ 20 mil por mês."
-              : "IRPJ de 15% e CSLL de 9% sobre o lucro antes do IR e da CSLL, mais 10% de adicional de IRPJ acima de R$ 20 mil por mês."}{" "}
-            Período de {p.meses} meses. As despesas não vêm da API: informe as do cliente.
-          </span>
-        </div>
+        )}
+        {p.regime === "lucroPresumido" && (
+          <label>
+            Atividade (presunção)
+            <select value={p.atividade} onChange={(e) => mudar({ ...base, atividade: e.target.value as "comercio" | "servicos" })}>
+              <option value="comercio">Comércio e indústria (8% IRPJ, 12% CSLL)</option>
+              <option value="servicos">Serviços (32% IRPJ, 32% CSLL)</option>
+            </select>
+          </label>
+        )}
+      </div>
+      <span className="cap-sub">
+        {simples
+          ? "No Simples Nacional, IRPJ e CSLL estão dentro do DAS e não são calculados à parte."
+          : p.regime === "lucroPresumido"
+            ? "IRPJ de 15% e CSLL de 9% sobre a base presumida da receita bruta, mais 10% de adicional de IRPJ acima de R$ 20 mil por mês."
+            : "IRPJ de 15% e CSLL de 9% sobre o lucro antes do IR e da CSLL, mais 10% de adicional de IRPJ acima de R$ 20 mil por mês."}{" "}
+        Período de {p.meses} {p.meses === 1 ? "mês" : "meses"}. Despesas e ajuste de estoque não vêm da API: informe os do cliente. As mesmas premissas valem na
+        DRE, no fluxo de caixa e no melhor regime.
+      </span>
+      {!simples && !p.despesas.valor && (
+        <p className="aviso cap-premissas-alerta">Margem sem despesas operacionais: o lucro líquido abaixo não representa o lucro real da empresa.</p>
       )}
     </div>
   )

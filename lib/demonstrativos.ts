@@ -59,6 +59,12 @@ export type PremissasIr = {
   /** Meses do período analisado (o adicional de IRPJ vale acima de R$ 20 mil por mês). */
   meses: number
   despesas: { modo: "percentual" | "valor"; valor: number }
+  /**
+   * Ajuste do custo para fechar com o balancete: nem toda compra vira custo no período (parte fica no
+   * estoque; ou sai mais do estoque do que entrou). Negativo reduz o custo; positivo aumenta. Em % do
+   * custo das compras ou em R$ no período.
+   */
+  custo?: { modo: "percentual" | "valor"; valor: number }
   /** Para a presunção do Lucro Presumido: comércio e indústria (8% e 12%) ou serviços (32% e 32%). */
   atividade: "comercio" | "servicos"
 }
@@ -90,8 +96,15 @@ export function montarDre(t: Trilha, cenarioId: string, premissas?: PremissasIr)
   const receitaBruta = (c: Colunas[number]) => receitaBrutaDe(c.vendas, c.dr)
   const deducoes = (c: Colunas[number]) => deducoesDe(c.vendas)
   const receitaLiquida = (c: Colunas[number]) => receitaBruta(c) - deducoes(c)
-  const custos = (c: Colunas[number]) => v0(c.compras, "custo")
+  const custoCompras = (c: Colunas[number]) => v0(c.compras, "custo")
+  const ajusteCusto = (c: Colunas[number]) => {
+    const a = premissas?.custo
+    if (!a || !a.valor) return 0
+    return a.modo === "percentual" ? (a.valor / 100) * custoCompras(c) : a.valor
+  }
+  const custos = (c: Colunas[number]) => custoCompras(c) + ajusteCusto(c)
   const lucro = (c: Colunas[number]) => receitaLiquida(c) - custos(c)
+  const temAjuste = !!premissas?.custo?.valor
   return [
     {
       id: "rb",
@@ -122,6 +135,9 @@ export function montarDre(t: Trilha, cenarioId: string, premissas?: PremissasIr)
           valores: cols.map((c) => v0(c.compras, "credito")),
           filhos: porTributo(cols, "custo-cred", (c) => v0(c.compras, "credito"), (c, tr) => v0(c.compras, `credito_${tr}`)),
         },
+        ...(temAjuste
+          ? [{ id: "custo-ajuste", nome: "(±) Ajuste de estoque / custo (informado)", valores: cols.map((c) => -ajusteCusto(c)) }]
+          : []),
       ],
     },
     { id: "lb", nome: "Lucro bruto", tipo: "resultado", valores: cols.map(lucro) },
